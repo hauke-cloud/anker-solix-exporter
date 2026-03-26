@@ -34,6 +34,9 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /build/anker-solix-exporter .
 
+# Copy migrations
+COPY migrations /etc/anker-solix-exporter/migrations
+
 # Create data directory for resume state
 RUN mkdir -p /data && chmod 755 /data
 

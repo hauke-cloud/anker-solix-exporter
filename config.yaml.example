@@ -15,21 +15,28 @@ anker:
   # Recommended: 5-10 minutes to respect API rate limits
   poll_interval: "5m"
 
-influxdb:
-  # InfluxDB server URL
-  url: "http://influxdb:8086"
+database:
+  # TimescaleDB/PostgreSQL connection settings
+  host: "localhost"
+  port: 5432
+  user: "anker_exporter"
+  password: "your-db-password"
+  database: "anker_solix"
+  sslmode: "disable"
   
-  # InfluxDB authentication token
-  token: "your-influxdb-token"
+  # Path to migration files
+  migrations_path: "/etc/anker-solix-exporter/migrations"
   
-  # InfluxDB organization name
-  org: "my-org"
-  
-  # InfluxDB bucket name
-  bucket: "solar"
-  
-  # Measurement name in InfluxDB
-  measurement: "solix_energy"
+  # Optional: TLS/SSL certificate-based authentication
+  # Uncomment and configure for mTLS (mutual TLS) authentication
+  # sslcert: "/path/to/client-cert.pem"      # Client certificate
+  # sslkey: "/path/to/client-key.pem"        # Client private key
+  # sslrootcert: "/path/to/ca-cert.pem"      # CA certificate
+  #
+  # Note: When using certificates, set sslmode to one of:
+  # - "require": Require SSL/TLS but don't verify server certificate
+  # - "verify-ca": Require SSL/TLS and verify server certificate against CA
+  # - "verify-full": Require SSL/TLS, verify certificate and hostname
 
 exporter:
   # Path to the resume state file

@@ -13,7 +13,7 @@ import (
 
 	"github.com/anker-solix-exporter/anker-solix-exporter/internal/anker"
 	"github.com/anker-solix-exporter/anker-solix-exporter/internal/config"
-	"github.com/anker-solix-exporter/anker-solix-exporter/internal/influxdb"
+	"github.com/anker-solix-exporter/anker-solix-exporter/internal/database"
 	"github.com/anker-solix-exporter/anker-solix-exporter/internal/resume"
 )
 
@@ -49,19 +49,17 @@ func main() {
 		logger.Fatal("failed to initialize resume state", zap.Error(err))
 	}
 
-	// Initialize InfluxDB writer
-	writer, err := influxdb.NewWriter(
-		cfg.InfluxDB.URL,
-		cfg.InfluxDB.Token,
-		cfg.InfluxDB.Org,
-		cfg.InfluxDB.Bucket,
-		cfg.InfluxDB.Measurement,
-		logger,
-	)
+	// Initialize database writer
+	writer, err := database.NewWriter(cfg.GetDSN(), logger)
 	if err != nil {
-		logger.Fatal("failed to initialize InfluxDB writer", zap.Error(err))
+		logger.Fatal("failed to initialize database writer", zap.Error(err))
 	}
 	defer writer.Close()
+
+	// Run database migrations
+	if err := database.RunMigrations(writer.GetDB(), cfg.Database.MigrationsPath, logger); err != nil {
+		logger.Fatal("failed to run database migrations", zap.Error(err))
+	}
 
 	// Initialize Anker client
 	client := anker.NewClient(cfg.Anker.Email, cfg.Anker.Password, cfg.Anker.Country)
@@ -99,7 +97,7 @@ func main() {
 
 type Exporter struct {
 	client *anker.Client
-	writer *influxdb.Writer
+	writer *database.Writer
 	state  *resume.State
 	config *config.Config
 	logger *zap.Logger
@@ -268,7 +266,7 @@ func (e *Exporter) processDevice(ctx context.Context, site anker.Site, device an
 		return nil
 	}
 
-	// Write to InfluxDB
+	// Write to database
 	if err := e.writer.WriteMeasurements(ctx, measurements); err != nil {
 		return err
 	}

@@ -10,17 +10,17 @@ func TestLoadConfig(t *testing.T) {
 	// Set required env vars
 	os.Setenv("ANKER_EMAIL", "test@example.com")
 	os.Setenv("ANKER_PASSWORD", "password123")
-	os.Setenv("INFLUXDB_URL", "http://localhost:8086")
-	os.Setenv("INFLUXDB_TOKEN", "token123")
-	os.Setenv("INFLUXDB_ORG", "test-org")
-	os.Setenv("INFLUXDB_BUCKET", "test-bucket")
+	os.Setenv("DB_HOST", "localhost")
+	os.Setenv("DB_USER", "test_user")
+	os.Setenv("DB_PASSWORD", "test_password")
+	os.Setenv("DB_NAME", "test_db")
 	defer func() {
 		os.Unsetenv("ANKER_EMAIL")
 		os.Unsetenv("ANKER_PASSWORD")
-		os.Unsetenv("INFLUXDB_URL")
-		os.Unsetenv("INFLUXDB_TOKEN")
-		os.Unsetenv("INFLUXDB_ORG")
-		os.Unsetenv("INFLUXDB_BUCKET")
+		os.Unsetenv("DB_HOST")
+		os.Unsetenv("DB_USER")
+		os.Unsetenv("DB_PASSWORD")
+		os.Unsetenv("DB_NAME")
 	}()
 
 	cfg, err := LoadConfig("")
@@ -36,8 +36,8 @@ func TestLoadConfig(t *testing.T) {
 		t.Errorf("Expected default country DE, got %s", cfg.Anker.Country)
 	}
 
-	if cfg.InfluxDB.URL != "http://localhost:8086" {
-		t.Errorf("Expected URL http://localhost:8086, got %s", cfg.InfluxDB.URL)
+	if cfg.Database.Host != "localhost" {
+		t.Errorf("Expected host localhost, got %s", cfg.Database.Host)
 	}
 }
 
@@ -55,11 +55,11 @@ func TestValidate(t *testing.T) {
 					Password:     "password",
 					PollInterval: "5m",
 				},
-				InfluxDB: InfluxDBConfig{
-					URL:    "http://localhost:8086",
-					Token:  "token",
-					Org:    "org",
-					Bucket: "bucket",
+				Database: DatabaseConfig{
+					Host:     "localhost",
+					User:     "test_user",
+					Password: "test_password",
+					Database: "test_db",
 				},
 			},
 			wantErr: false,
@@ -71,11 +71,11 @@ func TestValidate(t *testing.T) {
 					Password:     "password",
 					PollInterval: "5m",
 				},
-				InfluxDB: InfluxDBConfig{
-					URL:    "http://localhost:8086",
-					Token:  "token",
-					Org:    "org",
-					Bucket: "bucket",
+				Database: DatabaseConfig{
+					Host:     "localhost",
+					User:     "test_user",
+					Password: "test_password",
+					Database: "test_db",
 				},
 			},
 			wantErr: true,
@@ -88,11 +88,11 @@ func TestValidate(t *testing.T) {
 					Password:     "password",
 					PollInterval: "invalid",
 				},
-				InfluxDB: InfluxDBConfig{
-					URL:    "http://localhost:8086",
-					Token:  "token",
-					Org:    "org",
-					Bucket: "bucket",
+				Database: DatabaseConfig{
+					Host:     "localhost",
+					User:     "test_user",
+					Password: "test_password",
+					Database: "test_db",
 				},
 			},
 			wantErr: true,

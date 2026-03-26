@@ -1,42 +1,53 @@
 version: '3.8'
 
 services:
-  influxdb:
-    image: influxdb:2.7-alpine
-    container_name: influxdb
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: timescaledb
     ports:
-      - "8086:8086"
+      - "5432:5432"
     environment:
-      - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=admin
-      - DOCKER_INFLUXDB_INIT_PASSWORD=adminpassword
-      - DOCKER_INFLUXDB_INIT_ORG=my-org
-      - DOCKER_INFLUXDB_INIT_BUCKET=solar
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-auth-token
+      - POSTGRES_USER=anker_exporter
+      - POSTGRES_PASSWORD=anker_exporter_password
+      - POSTGRES_DB=anker_solix
     volumes:
-      - influxdb-data:/var/lib/influxdb2
+      - timescaledb-data:/var/lib/postgresql/data
     networks:
       - monitoring
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anker_exporter"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   anker-solix-exporter:
     build: .
     container_name: anker-solix-exporter
     depends_on:
-      - influxdb
+      timescaledb:
+        condition: service_healthy
     environment:
       - ANKER_EMAIL=${ANKER_EMAIL}
       - ANKER_PASSWORD=${ANKER_PASSWORD}
       - ANKER_COUNTRY=DE
       - ANKER_POLL_INTERVAL=5m
-      - INFLUXDB_URL=http://influxdb:8086
-      - INFLUXDB_TOKEN=my-super-secret-auth-token
-      - INFLUXDB_ORG=my-org
-      - INFLUXDB_BUCKET=solar
-      - INFLUXDB_MEASUREMENT=solix_energy
+      - DB_HOST=timescaledb
+      - DB_PORT=5432
+      - DB_USER=anker_exporter
+      - DB_PASSWORD=anker_exporter_password
+      - DB_NAME=anker_solix
+      - DB_SSLMODE=disable
+      - DB_MIGRATIONS_PATH=/etc/anker-solix-exporter/migrations
+      # Optional: Uncomment for certificate-based authentication
+      # - DB_SSLCERT=/certs/client-cert.pem
+      # - DB_SSLKEY=/certs/client-key.pem
+      # - DB_SSLROOTCERT=/certs/ca-cert.pem
       - LOG_LEVEL=info
       - RESUME_FILE=/data/last_export.json
     volumes:
       - exporter-data:/data
+      # Optional: Uncomment to mount certificates
+      # - ./certs:/certs:ro
     restart: unless-stopped
     networks:
       - monitoring
@@ -54,12 +65,12 @@ services:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
     depends_on:
-      - influxdb
+      - timescaledb
     networks:
       - monitoring
 
 volumes:
-  influxdb-data:
+  timescaledb-data:
   exporter-data:
   grafana-data:
 

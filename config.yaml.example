@@ -1,0 +1,40 @@
+# Example configuration file for Anker Solix Exporter
+# Copy this file to config.yaml and adjust values
+
+anker:
+  # Your Anker account email
+  email: "your.email@example.com"
+  
+  # Your Anker account password
+  password: "your-password"
+  
+  # Country code (e.g., DE, US, UK, FR)
+  country: "DE"
+  
+  # How often to poll for new data (e.g., 5m, 10m, 1h)
+  # Recommended: 5-10 minutes to respect API rate limits
+  poll_interval: "5m"
+
+influxdb:
+  # InfluxDB server URL
+  url: "http://influxdb:8086"
+  
+  # InfluxDB authentication token
+  token: "your-influxdb-token"
+  
+  # InfluxDB organization name
+  org: "my-org"
+  
+  # InfluxDB bucket name
+  bucket: "solar"
+  
+  # Measurement name in InfluxDB
+  measurement: "solix_energy"
+
+exporter:
+  # Path to the resume state file
+  # This file tracks the last exported timestamp for each device
+  resume_file: "/data/last_export.json"
+  
+  # Log level: debug, info, warn, error
+  log_level: "info"

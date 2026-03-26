@@ -1,0 +1,913 @@
+openapi: 3.0.3
+info:
+  title: Anker Solix API
+  description: |
+    Unofficial API documentation for Anker Solix Power/Solar devices including Solarbank, Inverters, Smart Meters, Portable Power Stations, and Home Energy Systems.
+    
+    **WARNING**: This is not an official Anker API. It can break at any time, and endpoints may be removed, added, or changed.
+    
+    **Authentication**: The API uses token-based authentication. First login to obtain a token, then use it in subsequent requests.
+    
+    **Rate Limiting**: The API enforces rate limits per endpoint:
+    - ~10-12 requests per minute for energy statistics endpoints
+    - Authentication tokens expire after some time
+    
+    Based on the excellent work by thomluther: https://github.com/thomluther/anker-solix-api
+  version: 1.0.0
+  contact:
+    name: Anker Solix API Community
+    url: https://github.com/thomluther/anker-solix-api
+  license:
+    name: MIT
+    url: https://github.com/thomluther/anker-solix-api/blob/main/LICENSE
+
+servers:
+  - url: https://ankerpower-api-eu.anker.com
+    description: European API Server
+  - url: https://ankerpower-api.anker.com
+    description: Global API Server (US, Asia, etc.)
+
+tags:
+  - name: Authentication
+    description: User authentication and session management
+  - name: Sites
+    description: Power system sites (home installations)
+  - name: Devices
+    description: Device information and management
+  - name: Energy
+    description: Energy data and statistics
+  - name: Schedules
+    description: Device schedules and automation
+  - name: Vehicles
+    description: Electric vehicle management (for EV Charger)
+
+security:
+  - BearerAuth: []
+  - GTokenAuth: []
+
+paths:
+  /passport/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate with email and password to receive an auth token
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  description: MD5 hash of the password
+                  example: 5f4dcc3b5aa765d61d8327deb882cf99
+                country:
+                  type: string
+                  description: Two-letter country code
+                  example: DE
+                  enum: [DE, US, UK, FR, ES, IT, AT, CH, NL, BE, PL, SE, NO, DK, FI, AU, NZ, JP, CN, IN]
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /power_service/v1/site/get_site_list:
+    post:
+      tags:
+        - Sites
+      summary: Get list of sites
+      description: Retrieve all power system sites accessible by the user
+      operationId: getSiteList
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: List of sites
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      site_list:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Site'
+
+  /power_service/v1/site/get_site_homepage:
+    post:
+      tags:
+        - Sites
+      summary: Get site homepage data
+      description: Scene info for configured sites as presented on App Home Page
+      operationId: getSiteHomepage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: Homepage data for all sites
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomepageResponse'
+
+  /power_service/v1/site/get_scen_info:
+    post:
+      tags:
+        - Sites
+      summary: Get scene information
+      description: Detailed scene info for a specific site with device details
+      operationId: getSceneInfo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - site_id
+              properties:
+                site_id:
+                  type: string
+                  description: Site identifier
+                  example: efaca6b5-f4a0-e82e-3b2e-6b9cf90ded8c
+      responses:
+        '200':
+          description: Scene information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SceneInfoResponse'
+
+  /power_service/v1/site/get_site_detail:
+    post:
+      tags:
+        - Sites
+      summary: Get site details
+      description: Detailed information for a given site_id
+      operationId: getSiteDetail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - site_id
+              properties:
+                site_id:
+                  type: string
+                  example: efaca6b5-f4a0-e82e-3b2e-6b9cf90ded8c
+      responses:
+        '200':
+          description: Site details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiteDetailResponse'
+
+  /power_service/v1/site/list_user_devices:
+    post:
+      tags:
+        - Devices
+      summary: List user devices
+      description: Get details of all devices owned by the user
+      operationId: listUserDevices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: List of user devices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDevicesResponse'
+
+  /power_service/v1/site/energy_analysis:
+    post:
+      tags:
+        - Energy
+      summary: Get energy data
+      description: Fetch energy statistics for given time frames (solar, battery, grid, home usage)
+      operationId: getEnergyAnalysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - site_id
+                - device_sn
+                - type
+                - start_time
+                - end_time
+              properties:
+                site_id:
+                  type: string
+                  description: Site identifier
+                  example: efaca6b5-f4a0-e82e-3b2e-6b9cf90ded8c
+                device_sn:
+                  type: string
+                  description: Device serial number
+                  example: 9JVB42LJK8J0P5RY
+                type:
+                  type: string
+                  description: Time granularity
+                  enum: [day, week, month, year]
+                  example: day
+                start_time:
+                  type: string
+                  format: date-time
+                  description: Start time in ISO 8601 format
+                  example: "2024-03-01T00:00:00Z"
+                end_time:
+                  type: string
+                  format: date-time
+                  description: End time in ISO 8601 format
+                  example: "2024-03-01T23:59:59Z"
+                device_type:
+                  type: string
+                  description: Type of device (solar_production, solarbank, grid, etc.)
+                  example: solar_production
+      responses:
+        '200':
+          description: Energy statistics data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnergyAnalysisResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /power_service/v1/site/get_site_device_param:
+    post:
+      tags:
+        - Schedules
+      summary: Get device parameters
+      description: Get device settings including schedules for a site
+      operationId: getDeviceParam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - site_id
+                - param_type
+              properties:
+                site_id:
+                  type: string
+                  example: efaca6b5-f4a0-e82e-3b2e-6b9cf90ded8c
+                param_type:
+                  type: string
+                  description: Parameter type to retrieve
+                  enum: ["4", "6", "12", "13", "16", "18"]
+                  example: "4"
+                device_sn:
+                  type: string
+                  description: Optional device serial number
+                  example: 9JVB42LJK8J0P5RY
+      responses:
+        '200':
+          description: Device parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceParamResponse'
+
+  /power_service/v1/site/set_site_device_param:
+    post:
+      tags:
+        - Schedules
+      summary: Set device parameters
+      description: Update device settings like schedules
+      operationId: setDeviceParam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - site_id
+                - param_type
+                - param_data
+              properties:
+                site_id:
+                  type: string
+                  example: efaca6b5-f4a0-e82e-3b2e-6b9cf90ded8c
+                param_type:
+                  type: string
+                  description: Parameter type to set
+                  example: "4"
+                param_data:
+                  type: object
+                  description: Parameter data (structure varies by param_type)
+      responses:
+        '200':
+          description: Parameters updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /power_service/v1/app/compatible/get_power_cutoff:
+    post:
+      tags:
+        - Devices
+      summary: Get power cutoff settings
+      description: Get minimum SOC (State of Charge) settings for Solarbank
+      operationId: getPowerCutoff
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - site_id
+                - device_sn
+              properties:
+                site_id:
+                  type: string
+                  example: efaca6b5-f4a0-e82e-3b2e-6b9cf90ded8c
+                device_sn:
+                  type: string
+                  example: 9JVB42LJK8J0P5RY
+      responses:
+        '200':
+          description: Power cutoff settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PowerCutoffResponse'
+
+  /power_service/v1/app/compatible/set_power_cutoff:
+    post:
+      tags:
+        - Devices
+      summary: Set power cutoff
+      description: Set minimum SOC for Solarbank device
+      operationId: setPowerCutoff
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - site_id
+                - device_sn
+                - cutoff_data
+              properties:
+                site_id:
+                  type: string
+                  example: efaca6b5-f4a0-e82e-3b2e-6b9cf90ded8c
+                device_sn:
+                  type: string
+                  example: 9JVB42LJK8J0P5RY
+                cutoff_data:
+                  type: object
+                  properties:
+                    min_soc:
+                      type: integer
+                      minimum: 5
+                      maximum: 100
+                      example: 10
+      responses:
+        '200':
+          description: Cutoff updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /power_service/v1/app/vehicle/get_vehicle_list:
+    post:
+      tags:
+        - Vehicles
+      summary: Get vehicle list
+      description: List all electric vehicles defined in the account
+      operationId: getVehicleList
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: List of vehicles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehicleListResponse'
+
+  /power_service/v1/app/vehicle/add_vehicle:
+    post:
+      tags:
+        - Vehicles
+      summary: Add vehicle
+      description: Add an electric vehicle to the account
+      operationId: addVehicle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_vehicle_info
+              properties:
+                user_vehicle_info:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - vehicle_name
+                      - brand
+                      - model
+                      - productive_year
+                    properties:
+                      vehicle_name:
+                        type: string
+                        example: MyCar
+                      brand:
+                        type: string
+                        example: Tesla
+                      model:
+                        type: string
+                        example: Model 3
+                      productive_year:
+                        type: integer
+                        example: 2024
+                      battery_capacity:
+                        type: number
+                        format: float
+                        example: 75
+                      ac_max_charging_power:
+                        type: number
+                        format: float
+                        example: 11
+      responses:
+        '200':
+          description: Vehicle added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /app/devicemanage/get_user_mqtt_info:
+    post:
+      tags:
+        - Devices
+      summary: Get MQTT connection info
+      description: Get MQTT broker details and certificates for real-time device monitoring
+      operationId: getMqttInfo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: MQTT connection information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MqttInfoResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Auth token received from login endpoint
+    GTokenAuth:
+      type: apiKey
+      in: header
+      name: gtoken
+      description: MD5 hash of encrypted user_id
+
+  schemas:
+    LoginResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: Response code (0 = success)
+          example: 0
+        msg:
+          type: string
+          example: success
+        data:
+          type: object
+          properties:
+            user_id:
+              type: string
+              example: abc123def456
+            email:
+              type: string
+              format: email
+              example: user@example.com
+            nick_name:
+              type: string
+              example: John
+            auth_token:
+              type: string
+              description: Authentication token for subsequent requests
+              example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+            token_expires_at:
+              type: integer
+              description: Unix timestamp when token expires
+              example: 1709251200
+            geo_key:
+              type: string
+              example: EU
+            country_code:
+              type: string
+              example: DE
+
+    Site:
+      type: object
+      properties:
+        site_id:
+          type: string
+          description: Unique site identifier
+          example: efaca6b5-f4a0-e82e-3b2e-6b9cf90ded8c
+        site_name:
+          type: string
+          example: My Home
+        site_admin:
+          type: boolean
+          description: Whether user is site administrator
+          example: true
+        power_site_type:
+          type: integer
+          description: Type of power system
+          example: 2
+        site_info:
+          type: object
+          properties:
+            site_power:
+              type: number
+              format: float
+              description: Current power in watts
+              example: 450.5
+            solar_power:
+              type: number
+              format: float
+              example: 800.0
+            battery_power:
+              type: number
+              format: float
+              example: 350.0
+            grid_power:
+              type: number
+              format: float
+              example: 100.0
+            battery_soc:
+              type: integer
+              description: Battery state of charge percentage
+              example: 85
+
+    Device:
+      type: object
+      properties:
+        device_sn:
+          type: string
+          description: Device serial number
+          example: 9JVB42LJK8J0P5RY
+        device_name:
+          type: string
+          example: Solarbank
+        device_pn:
+          type: string
+          description: Device part number
+          example: A17C0
+        device_type:
+          type: string
+          description: Device type category
+          example: solarbank
+          enum: [solarbank, inverter, smartmeter, smartplug, pps, powerpanel, hes]
+        alias_name:
+          type: string
+          example: Living Room Solarbank
+        battery_power:
+          type: string
+          description: Battery capacity in Wh
+          example: "1600"
+        generate_time:
+          type: integer
+          description: Unix timestamp of last data update
+          example: 1709251200
+
+    PowerData:
+      type: object
+      properties:
+        time:
+          type: string
+          format: date-time
+          description: Timestamp of the measurement
+          example: "2024-03-01T12:00:00Z"
+        solar_power:
+          type: number
+          format: float
+          description: Solar generation in watts
+          example: 450.5
+        output_power:
+          type: number
+          format: float
+          description: Output to home in watts
+          example: 380.0
+        grid_power:
+          type: number
+          format: float
+          description: Grid import/export in watts (positive = import)
+          example: -70.5
+        battery_power:
+          type: number
+          format: float
+          description: Battery charge/discharge in watts (positive = charging)
+          example: 350.0
+        battery_soc:
+          type: integer
+          description: Battery state of charge percentage
+          minimum: 0
+          maximum: 100
+          example: 85
+
+    HomepageResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+        msg:
+          type: string
+          example: success
+        data:
+          type: object
+          properties:
+            site_list:
+              type: array
+              items:
+                $ref: '#/components/schemas/Site'
+
+    SceneInfoResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+        msg:
+          type: string
+          example: success
+        data:
+          type: object
+          properties:
+            site_id:
+              type: string
+              example: efaca6b5-f4a0-e82e-3b2e-6b9cf90ded8c
+            site_name:
+              type: string
+              example: My Home
+            solar_list:
+              type: array
+              items:
+                $ref: '#/components/schemas/Device'
+            solarbank_list:
+              type: array
+              items:
+                $ref: '#/components/schemas/Device'
+
+    SiteDetailResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+        msg:
+          type: string
+          example: success
+        data:
+          $ref: '#/components/schemas/Site'
+
+    UserDevicesResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+        msg:
+          type: string
+          example: success
+        data:
+          type: object
+          properties:
+            device_list:
+              type: array
+              items:
+                $ref: '#/components/schemas/Device'
+
+    EnergyAnalysisResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+        msg:
+          type: string
+          example: success
+        data:
+          type: object
+          properties:
+            power:
+              type: array
+              items:
+                $ref: '#/components/schemas/PowerData'
+
+    DeviceParamResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+        msg:
+          type: string
+          example: success
+        data:
+          type: object
+          properties:
+            param_data:
+              type: object
+              description: Device parameters (structure varies by param_type)
+
+    PowerCutoffResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+        msg:
+          type: string
+          example: success
+        data:
+          type: object
+          properties:
+            min_soc:
+              type: integer
+              description: Minimum state of charge percentage
+              minimum: 5
+              maximum: 100
+              example: 10
+
+    VehicleListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+        msg:
+          type: string
+          example: success
+        data:
+          type: object
+          properties:
+            vehicle_list:
+              type: array
+              items:
+                type: object
+                properties:
+                  vehicle_id:
+                    type: string
+                    example: v123456
+                  vehicle_name:
+                    type: string
+                    example: MyCar
+                  brand:
+                    type: string
+                    example: Tesla
+                  model:
+                    type: string
+                    example: Model 3
+                  productive_year:
+                    type: integer
+                    example: 2024
+                  battery_capacity:
+                    type: number
+                    format: float
+                    example: 75
+                  ac_max_charging_power:
+                    type: number
+                    format: float
+                    example: 11
+
+    MqttInfoResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+        msg:
+          type: string
+          example: success
+        data:
+          type: object
+          properties:
+            mqtt_url:
+              type: string
+              example: mqtts://mqtt.ankercloud.com:8883
+            mqtt_username:
+              type: string
+              example: user123
+            mqtt_password:
+              type: string
+              example: pass123
+            client_id:
+              type: string
+              example: client123
+            certificate:
+              type: string
+              description: PEM-encoded certificate
+
+    SuccessResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+        msg:
+          type: string
+          example: success
+        data:
+          type: object
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: Error code (non-zero)
+          example: 10003
+        msg:
+          type: string
+          description: Error message
+          example: Invalid credentials
+        data:
+          type: object
+          nullable: true

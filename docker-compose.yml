@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=adminpassword
+      - DOCKER_INFLUXDB_INIT_ORG=my-org
+      - DOCKER_INFLUXDB_INIT_BUCKET=solar
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-auth-token
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    networks:
+      - monitoring
+
+  anker-solix-exporter:
+    build: .
+    container_name: anker-solix-exporter
+    depends_on:
+      - influxdb
+    environment:
+      - ANKER_EMAIL=${ANKER_EMAIL}
+      - ANKER_PASSWORD=${ANKER_PASSWORD}
+      - ANKER_COUNTRY=DE
+      - ANKER_POLL_INTERVAL=5m
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=my-super-secret-auth-token
+      - INFLUXDB_ORG=my-org
+      - INFLUXDB_BUCKET=solar
+      - INFLUXDB_MEASUREMENT=solix_energy
+      - LOG_LEVEL=info
+      - RESUME_FILE=/data/last_export.json
+    volumes:
+      - exporter-data:/data
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - influxdb
+    networks:
+      - monitoring
+
+volumes:
+  influxdb-data:
+  exporter-data:
+  grafana-data:
+
+networks:
+  monitoring:
+    driver: bridge

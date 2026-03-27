@@ -44,6 +44,32 @@ ls -la
 This will display all the files and directories in the cloned repository.
 
 
+## 🧪 Testing
+
+This project includes both unit tests and integration tests.
+
+### Running Tests
+
+```bash
+# Run all tests (unit + integration)
+make test
+
+# Run only unit tests (fast, no Docker required)
+make test-unit
+
+# Run integration tests (requires Docker)
+make test-integration
+```
+
+### Integration Tests
+
+Integration tests use [Testcontainers](https://testcontainers.com/) to test database operations with a real PostgreSQL instance. These tests:
+- Run automatically in GitHub Actions CI/CD
+- Skip gracefully when Docker is not available
+- Provide comprehensive testing of database interactions
+
+For more details, see [Integration Tests Documentation](docs/INTEGRATION_TESTS.md).
+
 
 ## 📄 License
 

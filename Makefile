@@ -28,6 +28,16 @@ test:
 	@echo "Running tests..."
 	go test -v -race -coverprofile=coverage.out ./...
 
+## Run unit tests only (skip integration tests)
+test-unit:
+	@echo "Running unit tests..."
+	go test -v -race -short -coverprofile=coverage.out ./...
+
+## Run integration tests
+test-integration:
+	@echo "Running integration tests..."
+	go test -v -race -coverprofile=coverage.out ./...
+
 ## Run tests with coverage
 coverage: test
 	go tool cover -html=coverage.out
@@ -115,19 +125,21 @@ deps:
 ## Show help
 help:
 	@echo "Available targets:"
-	@echo "  build          - Build the binary"
-	@echo "  test           - Run tests"
-	@echo "  coverage       - Run tests with coverage report"
-	@echo "  lint           - Run linters"
-	@echo "  clean          - Clean build artifacts"
-	@echo "  docker-build   - Build Docker image"
-	@echo "  docker-buildx  - Build multi-arch Docker images"
-	@echo "  docker-push    - Push Docker image"
-	@echo "  helm-lint      - Lint Helm chart"
-	@echo "  helm-package   - Package Helm chart"
-	@echo "  helm-install   - Install Helm chart"
-	@echo "  helm-upgrade   - Upgrade Helm chart"
-	@echo "  helm-uninstall - Uninstall Helm chart"
-	@echo "  run            - Run locally"
-	@echo "  deps           - Install dependencies"
-	@echo "  help           - Show this help"
+	@echo "  build             - Build the binary"
+	@echo "  test              - Run all tests"
+	@echo "  test-unit         - Run unit tests only"
+	@echo "  test-integration  - Run integration tests"
+	@echo "  coverage          - Run tests with coverage report"
+	@echo "  lint              - Run linters"
+	@echo "  clean             - Clean build artifacts"
+	@echo "  docker-build      - Build Docker image"
+	@echo "  docker-buildx     - Build multi-arch Docker images"
+	@echo "  docker-push       - Push Docker image"
+	@echo "  helm-lint         - Lint Helm chart"
+	@echo "  helm-package      - Package Helm chart"
+	@echo "  helm-install      - Install Helm chart"
+	@echo "  helm-upgrade      - Upgrade Helm chart"
+	@echo "  helm-uninstall    - Uninstall Helm chart"
+	@echo "  run               - Run locally"
+	@echo "  deps              - Install dependencies"
+	@echo "  help              - Show this help"

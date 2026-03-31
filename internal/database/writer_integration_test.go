@@ -315,6 +315,8 @@ func TestHelperFunctions(t *testing.T) {
 	})
 
 	t.Run("Reset", func(t *testing.T) {
+		testDB.Reset(t)
+
 		testDB.CreateTestMeasurements(t, 5)
 		testDB.AssertCount(t, 5)
 

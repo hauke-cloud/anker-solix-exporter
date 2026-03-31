@@ -28,9 +28,9 @@ func SetupTestDatabase(t *testing.T) *TestDatabase {
 
 	ctx := context.Background()
 
-	// Start PostgreSQL container
+	// Start TimescaleDB container (PostgreSQL with TimescaleDB extension)
 	pgContainer, err := postgres.Run(ctx,
-		"postgres:16-alpine",
+		"timescale/timescaledb:latest-pg16",
 		postgres.WithDatabase("testdb"),
 		postgres.WithUsername("testuser"),
 		postgres.WithPassword("testpass"),

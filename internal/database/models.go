@@ -8,8 +8,8 @@ import (
 
 // Measurement represents a single energy measurement from Anker Solix
 type Measurement struct {
-	ID           uint      `gorm:"primarykey"`
-	Timestamp    time.Time `gorm:"type:timestamptz;not null;index:idx_measurements_timestamp"`
+	ID           uint      `gorm:"primaryKey;autoIncrement"`
+	Timestamp    time.Time `gorm:"type:timestamptz;not null;primaryKey;index:idx_measurements_timestamp"`
 	SiteID       string    `gorm:"type:varchar(255);not null;index:idx_measurements_site_device"`
 	SiteName     string    `gorm:"type:varchar(255);not null"`
 	DeviceSN     string    `gorm:"type:varchar(255);not null;index:idx_measurements_site_device"`

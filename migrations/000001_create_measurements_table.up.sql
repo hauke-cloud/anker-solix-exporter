@@ -1,6 +1,6 @@
 -- Create measurements table
 CREATE TABLE IF NOT EXISTS measurements (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGSERIAL NOT NULL,
     timestamp TIMESTAMPTZ NOT NULL,
     site_id VARCHAR(255) NOT NULL,
     site_name VARCHAR(255) NOT NULL,
@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS measurements (
     grid_power DOUBLE PRECISION,
     battery_power DOUBLE PRECISION,
     battery_soc DOUBLE PRECISION,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, timestamp)
 );
 
 -- Create indexes

@@ -65,7 +65,7 @@ func SetupTestDatabase(t *testing.T) *TestDatabase {
 	}
 
 	// Run migrations
-	if err := RunMigrations(writer.GetDB(), "", logger); err != nil {
+	if err := RunMigrations(writer.GetDB(), "../../migrations", logger); err != nil {
 		writer.Close()
 		_ = testcontainers.TerminateContainer(pgContainer)
 		t.Fatalf("failed to run migrations: %s", err)

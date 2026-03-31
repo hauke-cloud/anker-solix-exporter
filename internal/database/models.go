@@ -19,7 +19,7 @@ type Measurement struct {
 	OutputPower  float64   `gorm:"type:double precision"`
 	GridPower    float64   `gorm:"type:double precision"`
 	BatteryPower float64   `gorm:"type:double precision"`
-	BatterySoC   float64   `gorm:"type:double precision"`
+	BatterySoC   float64   `gorm:"column:battery_soc;type:double precision"`
 	CreatedAt    time.Time `gorm:"type:timestamptz;not null;default:current_timestamp"`
 }
 

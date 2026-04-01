@@ -1,0 +1,137 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "anker-solix-exporter.fullname" . }}
+  labels:
+    {{- include "anker-solix-exporter.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "anker-solix-exporter.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- if .Values.configFile.enabled }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "anker-solix-exporter.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "anker-solix-exporter.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- if .Values.configFile.enabled }}
+        args:
+          - -config=/etc/anker-solix-exporter/config.yaml
+        {{- end }}
+        env:
+          - name: ANKER_EMAIL
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "anker-solix-exporter.secretName" . }}
+                key: ANKER_EMAIL
+          - name: ANKER_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "anker-solix-exporter.secretName" . }}
+                key: ANKER_PASSWORD
+          - name: ANKER_COUNTRY
+            value: {{ .Values.anker.country | quote }}
+          - name: ANKER_POLL_INTERVAL
+            value: {{ .Values.anker.pollInterval | quote }}
+          - name: DB_HOST
+            value: {{ .Values.database.host | quote }}
+          - name: DB_PORT
+            value: {{ .Values.database.port | quote }}
+          - name: DB_USER
+            value: {{ .Values.database.user | quote }}
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "anker-solix-exporter.databaseSecretName" . }}
+                key: DB_PASSWORD
+          - name: DB_NAME
+            value: {{ .Values.database.name | quote }}
+          - name: DB_SSLMODE
+            value: {{ .Values.database.sslmode | quote }}
+          - name: DB_MIGRATIONS_PATH
+            value: {{ .Values.database.migrationsPath | quote }}
+          {{- if .Values.database.tls.enabled }}
+          - name: DB_SSLCERT
+            value: "/etc/database-certs/tls.crt"
+          - name: DB_SSLKEY
+            value: "/etc/database-certs/tls.key"
+          - name: DB_SSLROOTCERT
+            value: "/etc/database-certs/ca.crt"
+          {{- end }}
+          - name: LOG_LEVEL
+            value: {{ .Values.exporter.logLevel | quote }}
+          - name: RESUME_FILE
+            value: {{ .Values.exporter.resumeFile | quote }}
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+        volumeMounts:
+          - name: data
+            mountPath: /data
+          {{- if .Values.configFile.enabled }}
+          - name: config
+            mountPath: /etc/anker-solix-exporter
+            readOnly: true
+          {{- end }}
+          {{- if .Values.database.tls.enabled }}
+          - name: database-certs
+            mountPath: /etc/database-certs
+            readOnly: true
+          {{- end }}
+          - name: tmp
+            mountPath: /tmp
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (printf "%s-data" (include "anker-solix-exporter.fullname" .)) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if .Values.configFile.enabled }}
+        - name: config
+          configMap:
+            name: {{ include "anker-solix-exporter.fullname" . }}-config
+        {{- end }}
+        {{- if .Values.database.tls.enabled }}
+        - name: database-certs
+          secret:
+            secretName: {{ .Values.database.tls.secretName | default (printf "%s-db-certs" (include "anker-solix-exporter.fullname" .)) }}
+            defaultMode: 0400
+        {{- end }}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

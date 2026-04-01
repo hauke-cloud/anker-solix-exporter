@@ -1,0 +1,11 @@
+{{- if .Values.configFile.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "anker-solix-exporter.fullname" . }}-config
+  labels:
+    {{- include "anker-solix-exporter.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    {{- .Values.configFile.content | nindent 4 }}
+{{- end }}

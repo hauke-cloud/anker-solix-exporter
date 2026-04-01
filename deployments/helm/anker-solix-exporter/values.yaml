@@ -1,0 +1,140 @@
+# Default values for anker-solix-exporter.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/yourusername/anker-solix-exporter
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+  runAsNonRoot: true
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Anker Solix configuration
+anker:
+  # Email for Anker account
+  email: ""
+  # Password for Anker account (will be stored in secret)
+  password: ""
+  # Country code (e.g., DE, US, UK)
+  country: "DE"
+  # How often to poll for new data (e.g., 5m, 10m, 1h)
+  pollInterval: "5m"
+  # Existing secret containing credentials
+  # If set, email and password above are ignored
+  # Secret should contain keys: ANKER_EMAIL and ANKER_PASSWORD
+  existingSecret: ""
+
+# Database configuration
+database:
+  # Database host
+  host: "timescaledb"
+  # Database port
+  port: 5432
+  # Database user
+  user: "anker_exporter"
+  # Database password (will be stored in secret)
+  password: ""
+  # Database name
+  name: "anker_solix"
+  # SSL mode (disable, require, verify-ca, verify-full)
+  sslmode: "disable"
+  # Path to migrations
+  migrationsPath: "/etc/anker-solix-exporter/migrations"
+  
+  # Optional: TLS/SSL certificate-based authentication
+  # When enabled, certificates will be mounted from secrets
+  tls:
+    enabled: false
+    # Secret name containing TLS certificates
+    # Secret should contain keys: tls.crt, tls.key, ca.crt
+    secretName: ""
+    # Alternatively, provide certificate content directly (not recommended for production)
+    cert: ""
+    key: ""
+    caCert: ""
+  
+  # Existing secret containing database credentials
+  # If set, password above is ignored
+  # Secret should contain key: DB_PASSWORD
+  existingSecret: ""
+
+# Exporter configuration
+exporter:
+  # Log level: debug, info, warn, error
+  logLevel: "info"
+  # Path to resume state file
+  resumeFile: "/data/last_export.json"
+
+# Persistence for resume state
+persistence:
+  enabled: true
+  # storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 100Mi
+  # existingClaim: ""
+
+# Optional: Configure config file via ConfigMap
+configFile:
+  enabled: false
+  # Full config.yaml content
+  content: |
+    anker:
+      email: user@example.com
+      password: password
+      country: DE
+      poll_interval: 5m
+    database:
+      host: timescaledb
+      port: 5432
+      user: anker_exporter
+      password: your-password
+      database: anker_solix
+      sslmode: disable
+      migrations_path: /etc/anker-solix-exporter/migrations
+    exporter:
+      resume_file: /data/last_export.json
+      log_level: info

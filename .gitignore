@@ -1,5 +1,6 @@
 # Binaries
 anker-solix-exporter
+!deployments
 *.exe
 *.exe~
 *.dll

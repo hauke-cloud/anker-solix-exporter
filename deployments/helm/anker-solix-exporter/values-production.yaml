@@ -1,0 +1,113 @@
+# Production-ready values for Anker Solix Exporter Helm Chart
+
+# Replica count - keep at 1 to avoid duplicate exports
+replicaCount: 1
+
+image:
+  repository: ghcr.io/yourusername/anker-solix-exporter
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+# Anker Solix configuration
+anker:
+  email: "your.email@example.com"
+  password: "your-secure-password"
+  country: "DE"
+  pollInterval: "5m"
+  # Use existing secret for credentials (recommended for production)
+  # existingSecret: "anker-credentials"
+
+# Database configuration
+database:
+  host: "timescaledb.monitoring.svc.cluster.local"
+  port: 5432
+  user: "anker_exporter"
+  password: "your-secure-db-password"
+  name: "anker_solix"
+  sslmode: "require"
+  migrationsPath: "/etc/anker-solix-exporter/migrations"
+  
+  # TLS certificate-based authentication (recommended for production)
+  tls:
+    enabled: false
+    # Reference an existing secret containing certificates
+    secretName: "database-tls-certs"
+    # The secret should contain:
+    # - tls.crt: Client certificate
+    # - tls.key: Client private key
+    # - ca.crt: CA certificate
+  
+  # Use existing secret for password (recommended for production)
+  # existingSecret: "database-credentials"
+
+# Exporter configuration
+exporter:
+  logLevel: "info"
+  resumeFile: "/data/last_export.json"
+
+# Persistence for resume state
+persistence:
+  enabled: true
+  # Specify storageClass for dynamic provisioning
+  # storageClass: "longhorn"
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  # Use existing PVC
+  # existingClaim: "anker-exporter-data"
+
+# Resource limits
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+  runAsNonRoot: true
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Node selector
+# nodeSelector:
+#   kubernetes.io/arch: amd64
+
+# Tolerations
+# tolerations:
+#   - key: "node-role.kubernetes.io/master"
+#     operator: "Exists"
+#     effect: "NoSchedule"
+
+# Affinity
+# affinity:
+#   nodeAffinity:
+#     requiredDuringSchedulingIgnoredDuringExecution:
+#       nodeSelectorTerms:
+#       - matchExpressions:
+#         - key: kubernetes.io/hostname
+#           operator: In
+#           values:
+#           - worker-node-1
+
+# Service account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod annotations
+podAnnotations: {}
+  # prometheus.io/scrape: "true"
+  # prometheus.io/port: "8080"

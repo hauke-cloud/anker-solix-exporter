@@ -69,9 +69,13 @@ jobs:
     strategy:
       matrix:
         platform:
-          - linux/amd64
-          - linux/arm64
-          - linux/arm/v7
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+          - os: linux
+            arch: arm
+            variant: v7
 
     steps:
       - name: Checkout code
@@ -99,29 +103,55 @@ jobs:
           echo "COMMIT=${GITHUB_SHA}" >> $GITHUB_OUTPUT
           echo "DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
 
-      - name: Prepare platform tag
+      - name: Prepare platform info
         id: platform
         run: |
-          platform=${{ matrix.platform }}
-          echo "tag=${platform//\//-}" >> $GITHUB_OUTPUT
+          PLATFORM="${{ matrix.platform.os }}/${{ matrix.platform.arch }}"
+          if [ -n "${{ matrix.platform.variant }}" ]; then
+            PLATFORM="${PLATFORM}/${{ matrix.platform.variant }}"
+            TAG_SUFFIX="${{ matrix.platform.os }}-${{ matrix.platform.arch }}-${{ matrix.platform.variant }}"
+          else
+            TAG_SUFFIX="${{ matrix.platform.os }}-${{ matrix.platform.arch }}"
+          fi
+          echo "platform=${PLATFORM}" >> $GITHUB_OUTPUT
+          echo "tag_suffix=${TAG_SUFFIX}" >> $GITHUB_OUTPUT
+
+      - name: Download Kaniko executor
+        run: |
+          curl -L https://github.com/GoogleContainerTools/kaniko/releases/latest/download/kaniko-amd64.tar.gz | tar xz -C /tmp
+          sudo mv /tmp/kaniko-linux-amd64 /usr/local/bin/kaniko
+          chmod +x /usr/local/bin/kaniko
+
+      - name: Create Kaniko config
+        run: |
+          mkdir -p $HOME/.docker
+          echo '{"auths":{"${{ env.REGISTRY }}":{"auth":"'$(echo -n "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" | base64)'"}}}' > $HOME/.docker/config.json
+
+      - name: Prepare tags for build
+        id: tags
+        run: |
+          TAGS="${{ steps.meta.outputs.tags }}"
+          DESTINATION_ARGS=""
+          for tag in $TAGS; do
+            DESTINATION_ARGS="${DESTINATION_ARGS} --destination=${tag}-${{ steps.platform.outputs.tag_suffix }}"
+          done
+          echo "destinations=${DESTINATION_ARGS}" >> $GITHUB_OUTPUT
 
       - name: Build and push with Kaniko
-        uses: int128/kaniko-action@v1
-        with:
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache: true
-          cache-repository: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache
-          build-args: |
-            VERSION=${{ steps.version.outputs.VERSION }}
-            COMMIT=${{ steps.version.outputs.COMMIT }}
-            DATE=${{ steps.version.outputs.DATE }}
-          kaniko-args: |
-            --custom-platform=${{ matrix.platform }}
-            --snapshot-mode=redo
-            --compressed-caching=false
-            --cache-copy-layers
+        run: |
+          /usr/local/bin/kaniko \
+            --context=${{ github.workspace }} \
+            --dockerfile=${{ github.workspace }}/Dockerfile \
+            ${{ steps.tags.outputs.destinations }} \
+            --build-arg=VERSION=${{ steps.version.outputs.VERSION }} \
+            --build-arg=COMMIT=${{ steps.version.outputs.COMMIT }} \
+            --build-arg=DATE=${{ steps.version.outputs.DATE }} \
+            --custom-platform=${{ steps.platform.outputs.platform }} \
+            --snapshot-mode=redo \
+            --compressed-caching=false \
+            --cache=true \
+            --cache-repo=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache \
+            ${{ github.event_name == 'pull_request' && '--no-push' || '' }}
 
   create-manifest:
     name: Create Multi-Arch Manifest

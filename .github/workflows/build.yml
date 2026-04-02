@@ -5,7 +5,7 @@ on:
     branches:
       - main
     tags:
-      - 'v*'
+      - "v*"
   pull_request:
     branches:
       - main
@@ -17,7 +17,7 @@ env:
 jobs:
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: github-arc-scaleset-heavy
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,7 +25,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version: "1.26"
 
       - name: Run unit tests
         run: |
@@ -41,7 +41,7 @@ jobs:
 
   test-integration:
     name: Integration Tests
-    runs-on: ubuntu-latest
+    runs-on: github-arc-scaleset-heavy
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -49,7 +49,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version: "1.26"
 
       - name: Run integration tests
         run: |
@@ -57,7 +57,7 @@ jobs:
 
   build:
     name: Build and Push
-    runs-on: ubuntu-latest
+    runs-on: github-arc-scaleset-heavy
     needs: [test, test-integration]
     permissions:
       contents: read
@@ -116,7 +116,7 @@ jobs:
 
   helm:
     name: Build and Push Helm Chart
-    runs-on: ubuntu-latest
+    runs-on: github-arc-scaleset-heavy
     needs: build
     if: github.event_name != 'pull_request'
     permissions:
@@ -132,7 +132,7 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
         with:
-          version: 'latest'
+          version: "latest"
 
       - name: Log in to Container Registry
         run: |
@@ -163,7 +163,7 @@ jobs:
 
   release:
     name: Create Release
-    runs-on: ubuntu-latest
+    runs-on: github-arc-scaleset-heavy
     needs: [build, helm]
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:

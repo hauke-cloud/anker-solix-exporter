@@ -30,6 +30,8 @@ jobs:
       - name: Run unit tests
         run: |
           go test -v -race -short -coverprofile=coverage-unit.out ./...
+        env:
+          CGO_ENABLED: 1
 
       - name: Run go vet
         run: go vet ./...
@@ -54,6 +56,8 @@ jobs:
       - name: Run integration tests
         run: |
           go test -v -race -coverprofile=coverage-integration.out ./...
+        env:
+          CGO_ENABLED: 1
 
   build:
     name: Build and Push

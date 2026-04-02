@@ -134,7 +134,7 @@ jobs:
 
       - name: Build and push with Kaniko
         run: |
-          kaniko \
+          /kaniko/executor \
             --context=${{ github.workspace }} \
             --dockerfile=${{ github.workspace }}/Dockerfile \
             ${{ steps.tags.outputs.destinations }} \

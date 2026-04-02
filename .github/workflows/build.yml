@@ -66,29 +66,18 @@ jobs:
     permissions:
       contents: read
       packages: write
+    strategy:
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+          - linux/arm/v7
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            image=moby/buildkit:latest
-            network=host
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata
         id: meta
@@ -110,27 +99,77 @@ jobs:
           echo "COMMIT=${GITHUB_SHA}" >> $GITHUB_OUTPUT
           echo "DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - name: Prepare platform tag
+        id: platform
+        run: |
+          platform=${{ matrix.platform }}
+          echo "tag=${platform//\//-}" >> $GITHUB_OUTPUT
+
+      - name: Build and push with Kaniko
+        uses: int128/kaniko-action@v1
         with:
-          context: .
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache: true
+          cache-repository: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache
           build-args: |
             VERSION=${{ steps.version.outputs.VERSION }}
             COMMIT=${{ steps.version.outputs.COMMIT }}
             DATE=${{ steps.version.outputs.DATE }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          provenance: false
-          sbom: false
+          kaniko-args: |
+            --custom-platform=${{ matrix.platform }}
+            --snapshot-mode=redo
+            --compressed-caching=false
+            --cache-copy-layers
+
+  create-manifest:
+    name: Create Multi-Arch Manifest
+    runs-on: github-arc-scaleset-heavy
+    needs: build
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+
+      - name: Install regctl
+        run: |
+          curl -L https://github.com/regclient/regclient/releases/latest/download/regctl-linux-amd64 -o regctl
+          chmod +x regctl
+          sudo mv regctl /usr/local/bin/
+
+      - name: Log in to Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | regctl registry login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+      - name: Create and push manifest
+        run: |
+          TAGS="${{ steps.meta.outputs.tags }}"
+          for tag in $TAGS; do
+            regctl manifest create "$tag" \
+              "${tag}-linux-amd64" \
+              "${tag}-linux-arm64" \
+              "${tag}-linux-arm-v7"
+          done
 
   helm:
     name: Build and Push Helm Chart
     runs-on: github-arc-scaleset-heavy
-    needs: build
+    needs: create-manifest
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
@@ -177,7 +216,7 @@ jobs:
   release:
     name: Create Release
     runs-on: github-arc-scaleset-heavy
-    needs: [build, helm]
+    needs: [create-manifest, helm]
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write

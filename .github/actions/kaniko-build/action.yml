@@ -117,18 +117,18 @@ runs:
 
     - name: Build and push with Kaniko
       id: build
-      uses: docker://${{ inputs.kaniko-image }}:${{ inputs.kaniko-version }}
-      with:
-        args: >-
-          --context=${{ github.workspace }}/${{ inputs.context }}
-          --dockerfile=${{ github.workspace }}/${{ inputs.dockerfile }}
-          ${{ steps.prepare.outputs.destinations }}
-          ${{ steps.prepare.outputs.build-args }}
-          --custom-platform=${{ inputs.platform }}
-          --snapshot-mode=redo
-          --compressed-caching=false
-          ${{ steps.prepare.outputs.cache-args }}
-          ${{ steps.prepare.outputs.push-arg }}
-          --digest-file=/tmp/digest
+      shell: bash
       env:
         DOCKER_CONFIG: /kaniko/.docker
+      run: |
+        /kaniko/executor \
+          --context=${{ github.workspace }}/${{ inputs.context }} \
+          --dockerfile=${{ github.workspace }}/${{ inputs.dockerfile }} \
+          ${{ steps.prepare.outputs.destinations }} \
+          ${{ steps.prepare.outputs.build-args }} \
+          --custom-platform=${{ inputs.platform }} \
+          --snapshot-mode=redo \
+          --compressed-caching=false \
+          ${{ steps.prepare.outputs.cache-args }} \
+          ${{ steps.prepare.outputs.push-arg }} \
+          --digest-file=/tmp/digest

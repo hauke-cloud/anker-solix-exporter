@@ -109,9 +109,23 @@ runs:
         fi
         echo "push-arg=${PUSH_ARG}" >> $GITHUB_OUTPUT
 
+    - name: Prepare auth config
+      shell: bash
+      run: |
+        mkdir -p ${{ github.workspace }}/.docker-tmp
+        cat > ${{ github.workspace }}/.docker-tmp/config.json << EOF
+        {
+          "auths": {
+            "${{ inputs.registry }}": {
+              "auth": "$(echo -n ${{ inputs.registry-username }}:${{ inputs.registry-password }} | base64)"
+            }
+          }
+        }
+        EOF
+
     - name: Build and push with Kaniko
       id: build
       uses: docker://gcr.io/kaniko-project/executor:v1.23.0-debug
       with:
         entrypoint: /bin/sh
-        args: -c "mkdir -p /kaniko/.docker && echo '{\"auths\":{\"${{ inputs.registry }}\":{\"auth\":\"'$(echo -n ${{ inputs.registry-username }}:${{ inputs.registry-password }} | base64)'\"'}}}' > /kaniko/.docker/config.json && /kaniko/executor --context=${{ github.workspace }}/${{ inputs.context }} --dockerfile=${{ github.workspace }}/${{ inputs.dockerfile }} ${{ steps.prepare.outputs.destinations }} ${{ steps.prepare.outputs.build-args }} --custom-platform=${{ inputs.platform }} --snapshot-mode=redo --compressed-caching=false ${{ steps.prepare.outputs.cache-args }} ${{ steps.prepare.outputs.push-arg }} --digest-file=/tmp/digest"
+        args: -c "mkdir -p /kaniko/.docker && cp ${{ github.workspace }}/.docker-tmp/config.json /kaniko/.docker/config.json && /kaniko/executor --context=${{ github.workspace }}/${{ inputs.context }} --dockerfile=${{ github.workspace }}/${{ inputs.dockerfile }} ${{ steps.prepare.outputs.destinations }} ${{ steps.prepare.outputs.build-args }} --custom-platform=${{ inputs.platform }} --snapshot-mode=redo --compressed-caching=false ${{ steps.prepare.outputs.cache-args }} ${{ steps.prepare.outputs.push-arg }} --digest-file=/tmp/digest"

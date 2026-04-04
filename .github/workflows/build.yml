@@ -117,38 +117,23 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Prepare Kaniko config
-        run: |
-          mkdir -p /kaniko/.docker
-          echo "{\"auths\":{\"${{ env.REGISTRY }}\":{\"auth\":\"$(echo -n ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} | base64)\"}}}" > /kaniko/.docker/config.json
-
-      - name: Prepare destination tags
-        id: destinations
-        run: |
-          TAGS="${{ needs.prepare.outputs.tags }}"
-          DESTINATION_ARGS=""
-          for tag in $TAGS; do
-            DESTINATION_ARGS="${DESTINATION_ARGS} --destination=${tag}-${{ matrix.suffix }}"
-          done
-          echo "args=${DESTINATION_ARGS}" >> $GITHUB_OUTPUT
-
       - name: Build and push with Kaniko
-        env:
-          DOCKER_CONFIG: /kaniko/.docker
-        run: |
-          /kaniko/executor \
-            --context=${{ github.workspace }} \
-            --dockerfile=${{ github.workspace }}/Dockerfile \
-            ${{ steps.destinations.outputs.args }} \
-            --build-arg=VERSION=${{ needs.prepare.outputs.version }} \
-            --build-arg=COMMIT=${{ needs.prepare.outputs.commit }} \
-            --build-arg=DATE=${{ needs.prepare.outputs.date }} \
-            --custom-platform=${{ matrix.platform }} \
-            --snapshot-mode=redo \
-            --compressed-caching=false \
-            --cache=true \
-            --cache-repo=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache \
-            ${{ github.event_name == 'pull_request' && '--no-push' || '' }}
+        uses: ./.github/actions/kaniko-build
+        with:
+          registry: ${{ env.REGISTRY }}
+          image-name: ${{ env.IMAGE_NAME }}
+          tags: ${{ needs.prepare.outputs.tags }}
+          platform: ${{ matrix.platform }}
+          tag-suffix: ${{ matrix.suffix }}
+          build-args: |
+            VERSION=${{ needs.prepare.outputs.version }}
+            COMMIT=${{ needs.prepare.outputs.commit }}
+            DATE=${{ needs.prepare.outputs.date }}
+          cache: true
+          cache-repo: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache
+          push: ${{ github.event_name != 'pull_request' }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
 
   create-manifest:
     name: Create Multi-Arch Manifest

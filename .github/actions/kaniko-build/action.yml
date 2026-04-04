@@ -112,14 +112,14 @@ runs:
     - name: Setup Kaniko config
       shell: bash
       run: |
-        mkdir -p /kaniko/.docker
-        echo "{\"auths\":{\"${{ inputs.registry }}\":{\"auth\":\"$(echo -n ${{ inputs.registry-username }}:${{ inputs.registry-password }} | base64)\"}}}" > /kaniko/.docker/config.json
+        mkdir -p $HOME/.docker
+        echo "{\"auths\":{\"${{ inputs.registry }}\":{\"auth\":\"$(echo -n ${{ inputs.registry-username }}:${{ inputs.registry-password }} | base64)\"}}}" > $HOME/.docker/config.json
 
     - name: Build and push with Kaniko
       id: build
       shell: bash
       env:
-        DOCKER_CONFIG: /kaniko/.docker
+        DOCKER_CONFIG: $HOME/.docker
       run: |
         /kaniko/executor \
           --context=${{ github.workspace }}/${{ inputs.context }} \

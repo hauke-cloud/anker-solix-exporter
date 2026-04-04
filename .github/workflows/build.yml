@@ -98,7 +98,7 @@ jobs:
       - name: Prepare platform matrix
         id: platforms
         run: |
-          echo 'matrix=[{"os":"linux","arch":"amd64","platform":"linux/amd64","suffix":"linux-amd64"},{"os":"linux","arch":"arm64","platform":"linux/arm64","suffix":"linux-arm64"},{"os":"linux","arch":"arm","variant":"v7","platform":"linux/arm/v7","suffix":"linux-arm-v7"}]' >> $GITHUB_OUTPUT
+          echo 'matrix=[{"os":"linux","arch":"amd64","platform":"linux/amd64","suffix":"linux-amd64"}]' >> $GITHUB_OUTPUT
 
   build:
     name: Build ${{ matrix.suffix }}
@@ -172,10 +172,7 @@ jobs:
         run: |
           TAGS="${{ steps.meta.outputs.tags }}"
           for tag in $TAGS; do
-            regctl manifest create "$tag" \
-              "${tag}-linux-amd64" \
-              "${tag}-linux-arm64" \
-              "${tag}-linux-arm-v7"
+            regctl image copy "${tag}-linux-amd64" "$tag"
           done
 
   helm:

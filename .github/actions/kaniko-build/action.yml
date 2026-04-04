@@ -122,6 +122,13 @@ runs:
       env:
         REGISTRY: ${{ inputs.registry }}
         AUTH_TOKEN: ${{ steps.auth.outputs.token }}
+        CONTEXT_PATH: ${{ inputs.context }}
+        DOCKERFILE_PATH: ${{ inputs.dockerfile }}
+        DESTINATIONS: ${{ steps.prepare.outputs.destinations }}
+        BUILD_ARGS: ${{ steps.prepare.outputs.build-args }}
+        PLATFORM: ${{ inputs.platform }}
+        CACHE_ARGS: ${{ steps.prepare.outputs.cache-args }}
+        PUSH_ARG: ${{ steps.prepare.outputs.push-arg }}
       with:
         entrypoint: /bin/sh
-        args: -c "mkdir -p /kaniko/.docker && printf '{\"auths\":{\"%s\":{\"auth\":\"%s\"}}}' \"$REGISTRY\" \"$AUTH_TOKEN\" > /kaniko/.docker/config.json && /kaniko/executor --context=${{ github.workspace }}/${{ inputs.context }} --dockerfile=${{ github.workspace }}/${{ inputs.dockerfile }} ${{ steps.prepare.outputs.destinations }} ${{ steps.prepare.outputs.build-args }} --custom-platform=${{ inputs.platform }} --snapshot-mode=redo --compressed-caching=false ${{ steps.prepare.outputs.cache-args }} ${{ steps.prepare.outputs.push-arg }} --digest-file=/tmp/digest"
+        args: -c "mkdir -p /kaniko/.docker && printf '{\"auths\":{\"%s\":{\"auth\":\"%s\"}}}' \"$REGISTRY\" \"$AUTH_TOKEN\" > /kaniko/.docker/config.json && /kaniko/executor --context=/github/workspace/$CONTEXT_PATH --dockerfile=/github/workspace/$DOCKERFILE_PATH $DESTINATIONS $BUILD_ARGS --custom-platform=$PLATFORM --snapshot-mode=redo --compressed-caching=false $CACHE_ARGS $PUSH_ARG --digest-file=/tmp/digest"

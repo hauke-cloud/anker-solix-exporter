@@ -1,0 +1,134 @@
+name: 'Kaniko Build and Push'
+description: 'Build and push multi-platform container images using Kaniko'
+author: 'Your Name'
+
+inputs:
+  context:
+    description: 'Build context path'
+    required: false
+    default: '.'
+  dockerfile:
+    description: 'Path to Dockerfile'
+    required: false
+    default: 'Dockerfile'
+  registry:
+    description: 'Container registry URL'
+    required: true
+  image-name:
+    description: 'Image name (without registry)'
+    required: true
+  tags:
+    description: 'Image tags (newline separated)'
+    required: true
+  platform:
+    description: 'Target platform (e.g., linux/amd64)'
+    required: true
+  tag-suffix:
+    description: 'Suffix to append to each tag'
+    required: false
+    default: ''
+  build-args:
+    description: 'Build arguments (newline separated KEY=VALUE pairs)'
+    required: false
+    default: ''
+  cache:
+    description: 'Enable layer caching'
+    required: false
+    default: 'true'
+  cache-repo:
+    description: 'Cache repository URL'
+    required: false
+    default: ''
+  push:
+    description: 'Push image to registry'
+    required: false
+    default: 'true'
+  kaniko-version:
+    description: 'Kaniko executor version'
+    required: false
+    default: 'v1.23.0'
+  kaniko-image:
+    description: 'Kaniko executor image'
+    required: false
+    default: 'gcr.io/kaniko-project/executor'
+  registry-username:
+    description: 'Registry username'
+    required: true
+  registry-password:
+    description: 'Registry password'
+    required: true
+
+outputs:
+  digest:
+    description: 'Image digest'
+    value: ${{ steps.build.outputs.digest }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Prepare Kaniko arguments
+      id: prepare
+      shell: bash
+      run: |
+        # Prepare destination arguments
+        DESTINATION_ARGS=""
+        while IFS= read -r tag; do
+          if [ -n "$tag" ]; then
+            if [ -n "${{ inputs.tag-suffix }}" ]; then
+              DESTINATION_ARGS="${DESTINATION_ARGS} --destination=${tag}-${{ inputs.tag-suffix }}"
+            else
+              DESTINATION_ARGS="${DESTINATION_ARGS} --destination=${tag}"
+            fi
+          fi
+        done <<< "${{ inputs.tags }}"
+        echo "destinations=${DESTINATION_ARGS}" >> $GITHUB_OUTPUT
+        
+        # Prepare build arguments
+        BUILD_ARGS=""
+        while IFS= read -r arg; do
+          if [ -n "$arg" ]; then
+            BUILD_ARGS="${BUILD_ARGS} --build-arg=${arg}"
+          fi
+        done <<< "${{ inputs.build-args }}"
+        echo "build-args=${BUILD_ARGS}" >> $GITHUB_OUTPUT
+        
+        # Prepare cache arguments
+        CACHE_ARGS=""
+        if [ "${{ inputs.cache }}" = "true" ]; then
+          CACHE_ARGS="--cache=true"
+          if [ -n "${{ inputs.cache-repo }}" ]; then
+            CACHE_ARGS="${CACHE_ARGS} --cache-repo=${{ inputs.cache-repo }}"
+          fi
+        fi
+        echo "cache-args=${CACHE_ARGS}" >> $GITHUB_OUTPUT
+        
+        # Prepare push argument
+        PUSH_ARG=""
+        if [ "${{ inputs.push }}" != "true" ]; then
+          PUSH_ARG="--no-push"
+        fi
+        echo "push-arg=${PUSH_ARG}" >> $GITHUB_OUTPUT
+
+    - name: Setup Kaniko config
+      shell: bash
+      run: |
+        mkdir -p /kaniko/.docker
+        echo "{\"auths\":{\"${{ inputs.registry }}\":{\"auth\":\"$(echo -n ${{ inputs.registry-username }}:${{ inputs.registry-password }} | base64)\"}}}" > /kaniko/.docker/config.json
+
+    - name: Build and push with Kaniko
+      id: build
+      uses: docker://${{ inputs.kaniko-image }}:${{ inputs.kaniko-version }}
+      with:
+        args: >-
+          --context=${{ github.workspace }}/${{ inputs.context }}
+          --dockerfile=${{ github.workspace }}/${{ inputs.dockerfile }}
+          ${{ steps.prepare.outputs.destinations }}
+          ${{ steps.prepare.outputs.build-args }}
+          --custom-platform=${{ inputs.platform }}
+          --snapshot-mode=redo
+          --compressed-caching=false
+          ${{ steps.prepare.outputs.cache-args }}
+          ${{ steps.prepare.outputs.push-arg }}
+          --digest-file=/tmp/digest
+      env:
+        DOCKER_CONFIG: /kaniko/.docker

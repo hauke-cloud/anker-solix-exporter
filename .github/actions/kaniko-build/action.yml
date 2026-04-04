@@ -1,70 +1,70 @@
-name: 'Kaniko Build and Push'
-description: 'Build and push multi-platform container images using Kaniko'
-author: 'Your Name'
+name: "Kaniko Build and Push"
+description: "Build and push multi-platform container images using Kaniko"
+author: "Your Name"
 
 inputs:
   context:
-    description: 'Build context path'
+    description: "Build context path"
     required: false
-    default: '.'
+    default: "."
   dockerfile:
-    description: 'Path to Dockerfile'
+    description: "Path to Dockerfile"
     required: false
-    default: 'Dockerfile'
+    default: "Dockerfile"
   registry:
-    description: 'Container registry URL'
+    description: "Container registry URL"
     required: true
   image-name:
-    description: 'Image name (without registry)'
+    description: "Image name (without registry)"
     required: true
   tags:
-    description: 'Image tags (newline separated)'
+    description: "Image tags (newline separated)"
     required: true
   platform:
-    description: 'Target platform (e.g., linux/amd64)'
+    description: "Target platform (e.g., linux/amd64)"
     required: true
   tag-suffix:
-    description: 'Suffix to append to each tag'
+    description: "Suffix to append to each tag"
     required: false
-    default: ''
+    default: ""
   build-args:
-    description: 'Build arguments (newline separated KEY=VALUE pairs)'
+    description: "Build arguments (newline separated KEY=VALUE pairs)"
     required: false
-    default: ''
+    default: ""
   cache:
-    description: 'Enable layer caching'
+    description: "Enable layer caching"
     required: false
-    default: 'true'
+    default: "true"
   cache-repo:
-    description: 'Cache repository URL'
+    description: "Cache repository URL"
     required: false
-    default: ''
+    default: ""
   push:
-    description: 'Push image to registry'
+    description: "Push image to registry"
     required: false
-    default: 'true'
+    default: "true"
   kaniko-version:
-    description: 'Kaniko executor version'
+    description: "Kaniko executor version"
     required: false
-    default: 'v1.23.0'
+    default: "v1.23.0"
   kaniko-image:
-    description: 'Kaniko executor image'
+    description: "Kaniko executor image"
     required: false
-    default: 'gcr.io/kaniko-project/executor'
+    default: "gcr.io/kaniko-project/executor"
   registry-username:
-    description: 'Registry username'
+    description: "Registry username"
     required: true
   registry-password:
-    description: 'Registry password'
+    description: "Registry password"
     required: true
 
 outputs:
   digest:
-    description: 'Image digest'
+    description: "Image digest"
     value: ${{ steps.build.outputs.digest }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Prepare Kaniko arguments
       id: prepare
@@ -82,7 +82,7 @@ runs:
           fi
         done <<< "${{ inputs.tags }}"
         echo "destinations=${DESTINATION_ARGS}" >> $GITHUB_OUTPUT
-        
+
         # Prepare build arguments
         BUILD_ARGS=""
         while IFS= read -r arg; do
@@ -91,7 +91,7 @@ runs:
           fi
         done <<< "${{ inputs.build-args }}"
         echo "build-args=${BUILD_ARGS}" >> $GITHUB_OUTPUT
-        
+
         # Prepare cache arguments
         CACHE_ARGS=""
         if [ "${{ inputs.cache }}" = "true" ]; then
@@ -101,7 +101,7 @@ runs:
           fi
         fi
         echo "cache-args=${CACHE_ARGS}" >> $GITHUB_OUTPUT
-        
+
         # Prepare push argument
         PUSH_ARG=""
         if [ "${{ inputs.push }}" != "true" ]; then
@@ -117,6 +117,7 @@ runs:
 
     - name: Build and push with Kaniko
       id: build
+      uses: docker://gcr.io/kaniko-project/executor:v1.23.0-debug
       shell: bash
       env:
         DOCKER_CONFIG: $HOME/.docker

@@ -97,6 +97,8 @@ jobs:
   build:
     name: Build and Push
     runs-on: github-arc-scaleset-kaniko
+    container:
+      image: gcr.io/kaniko-project/executor:v1.23.0-debug
     permissions:
       contents: read
       packages: write

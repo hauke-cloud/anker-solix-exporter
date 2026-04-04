@@ -68,6 +68,7 @@ jobs:
       version: ${{ steps.version.outputs.VERSION }}
       commit: ${{ steps.version.outputs.COMMIT }}
       date: ${{ steps.version.outputs.DATE }}
+      platforms: ${{ steps.platforms.outputs.matrix }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -94,8 +95,13 @@ jobs:
           echo "COMMIT=${GITHUB_SHA}" >> $GITHUB_OUTPUT
           echo "DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
 
+      - name: Prepare platform matrix
+        id: platforms
+        run: |
+          echo 'matrix=[{"os":"linux","arch":"amd64","platform":"linux/amd64","suffix":"linux-amd64"},{"os":"linux","arch":"arm64","platform":"linux/arm64","suffix":"linux-arm64"},{"os":"linux","arch":"arm","variant":"v7","platform":"linux/arm/v7","suffix":"linux-arm-v7"}]' >> $GITHUB_OUTPUT
+
   build:
-    name: Build and Push
+    name: Build ${{ matrix.suffix }}
     runs-on: github-arc-scaleset-kaniko
     container:
       image: gcr.io/kaniko-project/executor:v1.23.0-debug
@@ -105,14 +111,7 @@ jobs:
     needs: prepare
     strategy:
       matrix:
-        platform:
-          - os: linux
-            arch: amd64
-          - os: linux
-            arch: arm64
-          - os: linux
-            arch: arm
-            variant: v7
+        include: ${{ fromJson(needs.prepare.outputs.platforms) }}
 
     steps:
       - name: Checkout code
@@ -120,45 +119,38 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Prepare platform info
-        id: platform
+      - name: Prepare Kaniko config
         run: |
-          PLATFORM="${{ matrix.platform.os }}/${{ matrix.platform.arch }}"
-          if [ -n "${{ matrix.platform.variant }}" ]; then
-            PLATFORM="${PLATFORM}/${{ matrix.platform.variant }}"
-            TAG_SUFFIX="${{ matrix.platform.os }}-${{ matrix.platform.arch }}-${{ matrix.platform.variant }}"
-          else
-            TAG_SUFFIX="${{ matrix.platform.os }}-${{ matrix.platform.arch }}"
-          fi
-          echo "platform=${PLATFORM}" >> $GITHUB_OUTPUT
-          echo "tag_suffix=${TAG_SUFFIX}" >> $GITHUB_OUTPUT
+          mkdir -p /kaniko/.docker
+          echo "{\"auths\":{\"${{ env.REGISTRY }}\":{\"auth\":\"$(echo -n ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} | base64)\"}}}" > /kaniko/.docker/config.json
 
-      - name: Prepare build args
-        id: build-args
+      - name: Prepare destination tags
+        id: destinations
         run: |
-          cat << EOF > /tmp/build-args.txt
-          VERSION=${{ needs.prepare.outputs.version }}
-          COMMIT=${{ needs.prepare.outputs.commit }}
-          DATE=${{ needs.prepare.outputs.date }}
-          EOF
-          echo "args<<EOF" >> $GITHUB_OUTPUT
-          cat /tmp/build-args.txt >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          TAGS="${{ needs.prepare.outputs.tags }}"
+          DESTINATION_ARGS=""
+          for tag in $TAGS; do
+            DESTINATION_ARGS="${DESTINATION_ARGS} --destination=${tag}-${{ matrix.suffix }}"
+          done
+          echo "args=${DESTINATION_ARGS}" >> $GITHUB_OUTPUT
 
       - name: Build and push with Kaniko
-        uses: ./.github/actions/kaniko-build
-        with:
-          registry: ${{ env.REGISTRY }}
-          image-name: ${{ env.IMAGE_NAME }}
-          tags: ${{ needs.prepare.outputs.tags }}
-          platform: ${{ steps.platform.outputs.platform }}
-          tag-suffix: ${{ steps.platform.outputs.tag_suffix }}
-          build-args: ${{ steps.build-args.outputs.args }}
-          cache: true
-          cache-repo: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache
-          push: ${{ github.event_name != 'pull_request' }}
-          registry-username: ${{ github.actor }}
-          registry-password: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          DOCKER_CONFIG: /kaniko/.docker
+        run: |
+          /kaniko/executor \
+            --context=${{ github.workspace }} \
+            --dockerfile=${{ github.workspace }}/Dockerfile \
+            ${{ steps.destinations.outputs.args }} \
+            --build-arg=VERSION=${{ needs.prepare.outputs.version }} \
+            --build-arg=COMMIT=${{ needs.prepare.outputs.commit }} \
+            --build-arg=DATE=${{ needs.prepare.outputs.date }} \
+            --custom-platform=${{ matrix.platform }} \
+            --snapshot-mode=redo \
+            --compressed-caching=false \
+            --cache=true \
+            --cache-repo=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache \
+            ${{ github.event_name == 'pull_request' && '--no-push' || '' }}
 
   create-manifest:
     name: Create Multi-Arch Manifest

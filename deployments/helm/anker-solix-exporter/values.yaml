@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/yourusername/anker-solix-exporter
+  repository: ghcr.io/hauke-cloud/anker-solix-exporter
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
@@ -34,7 +34,7 @@ securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop:
-    - ALL
+      - ALL
   readOnlyRootFilesystem: true
   runAsNonRoot: true
   runAsUser: 1000
@@ -84,7 +84,7 @@ database:
   sslmode: "disable"
   # Path to migrations
   migrationsPath: "/etc/anker-solix-exporter/migrations"
-  
+
   # Optional: TLS/SSL certificate-based authentication
   # When enabled, certificates will be mounted from secrets
   tls:
@@ -96,7 +96,7 @@ database:
     cert: ""
     key: ""
     caCert: ""
-  
+
   # Existing secret containing database credentials
   # If set, password above is ignored
   # Secret should contain key: DB_PASSWORD

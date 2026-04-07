@@ -49,6 +49,18 @@ func main() {
 		logger.Fatal("failed to initialize resume state", zap.Error(err))
 	}
 
+	// Log database connection configuration (without sensitive data)
+	logger.Info("database configuration",
+		zap.String("host", cfg.Database.Host),
+		zap.Int("port", cfg.Database.Port),
+		zap.String("user", cfg.Database.User),
+		zap.String("database", cfg.Database.Database),
+		zap.String("sslmode", cfg.Database.SSLMode),
+		zap.String("sslcert", cfg.Database.SSLCert),
+		zap.String("sslkey", cfg.Database.SSLKey),
+		zap.String("sslrootcert", cfg.Database.SSLRootCert),
+	)
+
 	// Initialize database writer
 	writer, err := database.NewWriter(cfg.GetDSN(), logger)
 	if err != nil {

@@ -221,7 +221,7 @@ func (c *Client) doRequest(method, path string, body []byte, needAuth bool) (*ht
 	req.Header.Set("Timezone", "Europe/Berlin")
 	req.Header.Set("Model-Type", "DESKTOP")
 	req.Header.Set("App-Name", "anker_power")
-	req.Header.Set("Os-Type", "web")
+	req.Header.Set("Os-Type", "android")
 
 	if needAuth && c.authToken != "" {
 		req.Header.Set("X-Auth-Token", c.authToken)

@@ -62,11 +62,13 @@ spec:
             value: {{ .Values.database.port | quote }}
           - name: DB_USER
             value: {{ .Values.database.user | quote }}
+          {{- if or .Values.database.password .Values.database.existingSecret }}
           - name: DB_PASSWORD
             valueFrom:
               secretKeyRef:
                 name: {{ include "anker-solix-exporter.databaseSecretName" . }}
                 key: DB_PASSWORD
+          {{- end }}
           - name: DB_NAME
             value: {{ .Values.database.name | quote }}
           - name: DB_SSLMODE

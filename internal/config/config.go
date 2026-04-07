@@ -211,14 +211,18 @@ func (c *Config) GetPollInterval() time.Duration {
 
 // GetDSN returns the PostgreSQL DSN connection string
 func (c *Config) GetDSN() string {
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+	dsn := fmt.Sprintf("host=%s port=%d user=%s dbname=%s sslmode=%s",
 		c.Database.Host,
 		c.Database.Port,
 		c.Database.User,
-		c.Database.Password,
 		c.Database.Database,
 		c.Database.SSLMode,
 	)
+	
+	// Only add password if it's set (not needed for certificate auth)
+	if c.Database.Password != "" {
+		dsn += fmt.Sprintf(" password=%s", c.Database.Password)
+	}
 	
 	// Add SSL certificate parameters if configured
 	if c.Database.SSLCert != "" {

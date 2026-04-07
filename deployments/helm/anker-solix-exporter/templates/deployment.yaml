@@ -60,6 +60,7 @@ spec:
             value: {{ .Values.database.host | quote }}
           - name: DB_PORT
             value: {{ .Values.database.port | quote }}
+          {{- if not .Values.database.tls.enabled }}
           - name: DB_USER
             value: {{ .Values.database.user | quote }}
           {{- if or .Values.database.password .Values.database.existingSecret }}
@@ -68,6 +69,19 @@ spec:
               secretKeyRef:
                 name: {{ include "anker-solix-exporter.databaseSecretName" . }}
                 key: DB_PASSWORD
+          {{- end }}
+          {{- else }}
+          {{- if .Values.database.user }}
+          - name: DB_USER
+            value: {{ .Values.database.user | quote }}
+          {{- end }}
+          {{- if or .Values.database.password .Values.database.existingSecret }}
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "anker-solix-exporter.databaseSecretName" . }}
+                key: DB_PASSWORD
+          {{- end }}
           {{- end }}
           - name: DB_NAME
             value: {{ .Values.database.name | quote }}

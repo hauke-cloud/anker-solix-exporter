@@ -150,11 +150,16 @@ func (c *Config) Validate() error {
 	if c.Database.Host == "" {
 		return fmt.Errorf("database host is required")
 	}
-	if c.Database.User == "" {
-		return fmt.Errorf("database user is required")
-	}
-	if c.Database.Password == "" {
-		return fmt.Errorf("database password is required")
+	// When using client certificate authentication, user and password may be derived from the certificate
+	usingClientCert := c.Database.SSLCert != "" && c.Database.SSLKey != ""
+	
+	if !usingClientCert {
+		if c.Database.User == "" {
+			return fmt.Errorf("database user is required")
+		}
+		if c.Database.Password == "" {
+			return fmt.Errorf("database password is required")
+		}
 	}
 	if c.Database.Database == "" {
 		return fmt.Errorf("database name is required")

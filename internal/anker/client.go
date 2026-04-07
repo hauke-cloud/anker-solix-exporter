@@ -2,7 +2,12 @@ package anker
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/ecdh"
 	"crypto/md5"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -14,21 +19,43 @@ import (
 const (
 	baseURL    = "https://ankerpower-api-eu.anker.com"
 	apiVersion = "v2"
+	
+	// Anker API server's public key (uncompressed format: 04 + x-coordinate + y-coordinate)
+	ankerPublicKeyHex = "04c5c00c4f8d1197cc7c3167c52bf7acb054d722f0ef08dcd7e0883236e0d72a3868d9750cb47fa4619248f3d83f0f662671dadc6e2d31c2f41db0161651c7c076"
 )
 
 type Client struct {
-	email      string
-	password   string
-	country    string
-	httpClient *http.Client
-	authToken  string
-	userID     string
+	email       string
+	password    string
+	country     string
+	httpClient  *http.Client
+	authToken   string
+	userID      string
+	privateKey  *ecdh.PrivateKey
+	sharedKey   []byte
+}
+
+// Getter methods for testing
+func (c *Client) GetSharedKey() []byte {
+	return c.sharedKey
+}
+
+func (c *Client) GetUserID() string {
+	return c.userID
+}
+
+func (c *Client) GetAuthToken() string {
+	return c.authToken
 }
 
 type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Country  string `json:"country"`
+	AB               string                 `json:"ab"`
+	ClientSecretInfo map[string]interface{} `json:"client_secret_info"`
+	Enc              int                    `json:"enc"`
+	Email            string                 `json:"email"`
+	Password         string                 `json:"password"`
+	TimeZone         int64                  `json:"time_zone"`
+	Transaction      string                 `json:"transaction"`
 }
 
 type LoginResponse struct {
@@ -106,10 +133,66 @@ type Measurement struct {
 }
 
 func NewClient(email, password, country string) *Client {
+	// Generate ECDH key pair for password encryption
+	curve := ecdh.P256()
+	privateKey, err := curve.GenerateKey(rand.Reader)
+	if err != nil {
+		// Fallback to no encryption if key generation fails
+		return &Client{
+			email:    email,
+			password: password,
+			country:  country,
+			httpClient: &http.Client{
+				Timeout: 30 * time.Second,
+			},
+		}
+	}
+	
+	// Decode Anker's server public key
+	serverPubKeyBytes, err := hex.DecodeString(ankerPublicKeyHex)
+	if err != nil {
+		return &Client{
+			email:    email,
+			password: password,
+			country:  country,
+			httpClient: &http.Client{
+				Timeout: 30 * time.Second,
+			},
+		}
+	}
+	
+	// Import server's public key
+	serverPubKey, err := curve.NewPublicKey(serverPubKeyBytes)
+	if err != nil {
+		return &Client{
+			email:    email,
+			password: password,
+			country:  country,
+			httpClient: &http.Client{
+				Timeout: 30 * time.Second,
+			},
+		}
+	}
+	
+	// Compute shared secret using ECDH
+	sharedSecret, err := privateKey.ECDH(serverPubKey)
+	if err != nil {
+		return &Client{
+			email:    email,
+			password: password,
+			country:  country,
+			httpClient: &http.Client{
+				Timeout: 30 * time.Second,
+			},
+		}
+	}
+	
 	return &Client{
-		email:    email,
-		password: password,
-		country:  country,
+		email:      email,
+		password:   password,
+		country:    country,
+		privateKey: privateKey,
+		sharedKey:  sharedSecret,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -117,12 +200,33 @@ func NewClient(email, password, country string) *Client {
 }
 
 func (c *Client) Login() error {
-	passwordHash := c.hashPassword(c.password)
+	// Encrypt password using AES-256-CBC with the shared secret
+	encryptedPassword, err := c.encryptPassword(c.password)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt password: %w", err)
+	}
+	
+	// Get current timezone offset in milliseconds
+	now := time.Now()
+	_, offset := now.Zone()
+	timezoneOffset := int64(offset * 1000) // Convert seconds to milliseconds
+	
+	// Generate transaction ID (Unix timestamp in milliseconds)
+	transaction := fmt.Sprintf("%d", now.UnixMilli())
+	
+	// Get client public key in hex format
+	publicKeyBytes := c.privateKey.PublicKey().Bytes()
 	
 	reqBody := LoginRequest{
-		Email:    c.email,
-		Password: passwordHash,
-		Country:  c.country,
+		AB:    c.country,
+		Email: c.email,
+		ClientSecretInfo: map[string]interface{}{
+			"public_key": hex.EncodeToString(publicKeyBytes),
+		},
+		Enc:         0,
+		Password:    encryptedPassword,
+		TimeZone:    timezoneOffset,
+		Transaction: transaction,
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -218,13 +322,20 @@ func (c *Client) doRequest(method, path string, body []byte, needAuth bool) (*ht
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Country", c.country)
-	req.Header.Set("Timezone", "Europe/Berlin")
+	req.Header.Set("Timezone", "GMT+01:00") // Use standard GMT format
 	req.Header.Set("Model-Type", "DESKTOP")
 	req.Header.Set("App-Name", "anker_power")
 	req.Header.Set("Os-Type", "android")
+	req.Header.Set("App-Version", "3.0.0") // Add app version
+	req.Header.Set("Language", "en") // Add language header
 
 	if needAuth && c.authToken != "" {
 		req.Header.Set("X-Auth-Token", c.authToken)
+		// gtoken is MD5 hash of user_id
+		if c.userID != "" {
+			gtoken := c.hashPassword(c.userID) // Reuse MD5 function
+			req.Header.Set("Gtoken", gtoken)
+		}
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -241,9 +352,44 @@ func (c *Client) doRequest(method, path string, body []byte, needAuth bool) (*ht
 	return resp, nil
 }
 
+func (c *Client) encryptPassword(password string) (string, error) {
+	if c.sharedKey == nil {
+		// Fallback to MD5 hash if encryption not available
+		return c.hashPassword(password), nil
+	}
+	
+	// Use AES-256-CBC with PKCS7 padding
+	// The IV is the first 16 bytes of the shared secret
+	block, err := aes.NewCipher(c.sharedKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to create cipher: %w", err)
+	}
+	
+	// Apply PKCS7 padding
+	paddedPassword := pkcs7Pad([]byte(password), aes.BlockSize)
+	
+	// Use first 16 bytes of shared key as IV
+	iv := c.sharedKey[:aes.BlockSize]
+	
+	// Encrypt
+	ciphertext := make([]byte, len(paddedPassword))
+	mode := cipher.NewCBCEncrypter(block, iv)
+	mode.CryptBlocks(ciphertext, paddedPassword)
+	
+	// Return base64 encoded ciphertext
+	return base64.StdEncoding.EncodeToString(ciphertext), nil
+}
+
 func (c *Client) hashPassword(password string) string {
 	hash := md5.Sum([]byte(password))
 	return hex.EncodeToString(hash[:])
+}
+
+// pkcs7Pad applies PKCS7 padding to the data
+func pkcs7Pad(data []byte, blockSize int) []byte {
+	padding := blockSize - (len(data) % blockSize)
+	padText := bytes.Repeat([]byte{byte(padding)}, padding)
+	return append(data, padText...)
 }
 
 func (c *Client) IsAuthenticated() bool {

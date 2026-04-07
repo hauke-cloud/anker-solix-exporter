@@ -75,11 +75,11 @@ database:
   # Database port
   port: 5432
   # Database user
-  user: "anker_exporter"
+  user: ""
   # Database password (will be stored in secret)
   password: ""
   # Database name
-  name: "anker_solix"
+  name: "timescale"
   # SSL mode (disable, require, verify-ca, verify-full)
   sslmode: "disable"
   # Path to migrations

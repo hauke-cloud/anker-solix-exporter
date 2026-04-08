@@ -89,27 +89,27 @@ func (h *RequestHandler) execute(
 }
 
 // executeRaw performs an API request and returns the raw http.Response for custom handling
-func (h *RequestHandler) executeRaw(
-	method string,
-	endpoint string,
-	request interface{},
-	needAuth bool,
-) (*http.Response, error) {
-	// Marshal request body if provided
-	var body []byte
-	var err error
-	if request != nil {
-		body, err = json.Marshal(request)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal request: %w", err)
-		}
-	}
-
-	// Perform HTTP request
-	resp, err := h.client.doRequest(method, endpoint, body, needAuth)
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
-	}
-
-	return resp, nil
-}
+// func (h *RequestHandler) executeRaw(
+// 	method string,
+// 	endpoint string,
+// 	request interface{},
+// 	needAuth bool,
+// ) (*http.Response, error) {
+// 	// Marshal request body if provided
+// 	var body []byte
+// 	var err error
+// 	if request != nil {
+// 		body, err = json.Marshal(request)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("failed to marshal request: %w", err)
+// 		}
+// 	}
+//
+// 	// Perform HTTP request
+// 	resp, err := h.client.doRequest(method, endpoint, body, needAuth)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("request failed: %w", err)
+// 	}
+//
+// 	return resp, nil
+// }

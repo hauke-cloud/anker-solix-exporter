@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
@@ -17,7 +18,16 @@ func RunMigrations(db *gorm.DB, migrationsPath string, logger *zap.Logger) error
 		return fmt.Errorf("failed to get database instance: %w", err)
 	}
 
-	driver, err := postgres.WithInstance(sqlDB, &postgres.Config{})
+	// Configure connection settings for migrations to prevent SSL timeouts
+	// Temporarily increase connection lifetime during migration
+	originalMaxLifetime := 1 * time.Hour
+	sqlDB.SetConnMaxLifetime(30 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(10 * time.Minute)
+	defer sqlDB.SetConnMaxLifetime(originalMaxLifetime)
+
+	driver, err := postgres.WithInstance(sqlDB, &postgres.Config{
+		MigrationsTable: "schema_migrations",
+	})
 	if err != nil {
 		return fmt.Errorf("failed to create migration driver: %w", err)
 	}
@@ -63,5 +73,38 @@ func RunMigrations(db *gorm.DB, migrationsPath string, logger *zap.Logger) error
 		logger.Info("database is up to date")
 	}
 
+	// Verify critical tables exist
+	if err := verifyTablesExist(db, logger); err != nil {
+		logger.Error("database verification failed after migrations", zap.Error(err))
+		return fmt.Errorf("database verification failed: %w", err)
+	}
+
+	return nil
+}
+
+// verifyTablesExist checks that critical tables exist in the database
+func verifyTablesExist(db *gorm.DB, logger *zap.Logger) error {
+	var exists bool
+	
+	// Check if measurements table exists
+	err := db.Raw(`
+		SELECT EXISTS (
+			SELECT FROM information_schema.tables 
+			WHERE table_schema = 'public' 
+			AND table_name = 'measurements'
+		)
+	`).Scan(&exists).Error
+	
+	if err != nil {
+		return fmt.Errorf("failed to check if measurements table exists: %w", err)
+	}
+	
+	if !exists {
+		logger.Error("measurements table does not exist despite migrations being marked as complete",
+			zap.String("hint", "database may be in inconsistent state - reset migrations with: DELETE FROM schema_migrations; then restart"))
+		return fmt.Errorf("measurements table does not exist - please reset migration state and restart")
+	}
+	
+	logger.Info("database verification passed", zap.Bool("measurements_table_exists", exists))
 	return nil
 }

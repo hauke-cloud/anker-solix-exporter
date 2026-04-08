@@ -42,3 +42,8 @@ config.yaml
 
 # Kubernetes
 *.kubeconfig
+
+# Skaffold
+tmp/
+build-errors.log
+skaffold.local.yaml

@@ -49,6 +49,26 @@ type ExporterConfig struct {
 
 // LoadConfig loads configuration from file and environment variables
 func LoadConfig(configPath string) (*Config, error) {
+	// Determine default migrations path
+	// Try container path first, fall back to local path
+	migrationsPath := "/etc/anker-solix-exporter/migrations"
+	if _, err := os.Stat(migrationsPath); os.IsNotExist(err) {
+		// Try relative path for local development
+		if _, err := os.Stat("migrations"); err == nil {
+			migrationsPath = "migrations"
+		} else if _, err := os.Stat("./migrations"); err == nil {
+			migrationsPath = "./migrations"
+		}
+	}
+
+	// Determine default resume file path
+	// Use /data for container, current dir for local development
+	resumeFile := "/data/last_export.json"
+	if _, err := os.Stat("/data"); os.IsNotExist(err) {
+		// Local development - use current directory
+		resumeFile = "last_export.json"
+	}
+
 	config := &Config{
 		Anker: AnkerConfig{
 			Country:      "DE",
@@ -58,10 +78,10 @@ func LoadConfig(configPath string) (*Config, error) {
 			Host:           "localhost",
 			Port:           5432,
 			SSLMode:        "disable",
-			MigrationsPath: "/etc/anker-solix-exporter/migrations",
+			MigrationsPath: migrationsPath,
 		},
 		Exporter: ExporterConfig{
-			ResumeFile: "/data/last_export.json",
+			ResumeFile: resumeFile,
 			LogLevel:   "info",
 		},
 	}

@@ -25,7 +25,8 @@ database:
   sslmode: "disable"
   
   # Path to migration files
-  migrations_path: "/etc/anker-solix-exporter/migrations"
+  # Default: Auto-detects "/etc/anker-solix-exporter/migrations" (container) or "./migrations" (local)
+  # migrations_path: "/etc/anker-solix-exporter/migrations"
   
   # Optional: TLS/SSL certificate-based authentication
   # Uncomment and configure for mTLS (mutual TLS) authentication
@@ -41,7 +42,8 @@ database:
 exporter:
   # Path to the resume state file
   # This file tracks the last exported timestamp for each device
-  resume_file: "/data/last_export.json"
+  # Default: Auto-detects "/data/last_export.json" (container) or "./last_export.json" (local)
+  # resume_file: "/data/last_export.json"
   
   # Log level: debug, info, warn, error
   log_level: "info"

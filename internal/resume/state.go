@@ -117,7 +117,7 @@ func (s *State) GetDeviceState(deviceKey string) (DeviceState, bool) {
 func (s *State) UpdateDeviceState(deviceKey string, lastDataTime time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	s.Devices[deviceKey] = DeviceState{
 		LastExportTime: time.Now(),
 		LastDataTime:   lastDataTime,
@@ -143,7 +143,7 @@ func (s *State) GetResumeTime(deviceKey string, defaultLookback time.Duration) t
 		// No previous data, start from defaultLookback ago
 		return time.Now().Add(-defaultLookback)
 	}
-	
+
 	// Resume from last known data point
 	return state.LastDataTime
 }

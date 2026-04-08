@@ -15,10 +15,13 @@ type Config struct {
 }
 
 type AnkerConfig struct {
-	Email        string `yaml:"email"`
-	Password     string `yaml:"password"`
-	Country      string `yaml:"country"`
-	PollInterval string `yaml:"poll_interval"`
+	Email          string  `yaml:"email"`
+	Password       string  `yaml:"password"`
+	Country        string  `yaml:"country"`
+	PollInterval   string  `yaml:"poll_interval"`
+	Debug          bool    `yaml:"debug"` // Enable debug logging for Anker API
+	EndpointLimit  int     `yaml:"endpoint_limit"`  // Max requests per endpoint per minute (default: 10)
+	RequestDelay   float64 `yaml:"request_delay"`   // Minimum delay between requests in seconds (default: 0.3)
 }
 
 type DatabaseConfig struct {
@@ -30,21 +33,21 @@ type DatabaseConfig struct {
 	SSLMode        string `yaml:"sslmode"`
 	MigrationsPath string `yaml:"migrations_path"`
 	// TLS/SSL certificate configuration (optional)
-	SSLCert       string `yaml:"sslcert"`        // Path to client certificate
-	SSLKey        string `yaml:"sslkey"`         // Path to client key
-	SSLRootCert   string `yaml:"sslrootcert"`    // Path to CA certificate
+	SSLCert     string `yaml:"sslcert"`     // Path to client certificate
+	SSLKey      string `yaml:"sslkey"`      // Path to client key
+	SSLRootCert string `yaml:"sslrootcert"` // Path to CA certificate
 }
 
 type DatabaseTLSConfig struct {
-	Enabled     bool
-	CertFile    string
-	KeyFile     string
+	Enabled      bool
+	CertFile     string
+	KeyFile      string
 	RootCertFile string
 }
 
 type ExporterConfig struct {
-	ResumeFile   string `yaml:"resume_file"`
-	LogLevel     string `yaml:"log_level"`
+	ResumeFile string `yaml:"resume_file"`
+	LogLevel   string `yaml:"log_level"`
 }
 
 // LoadConfig loads configuration from file and environment variables
@@ -71,8 +74,10 @@ func LoadConfig(configPath string) (*Config, error) {
 
 	config := &Config{
 		Anker: AnkerConfig{
-			Country:      "DE",
-			PollInterval: "5m",
+			Country:       "DE",
+			PollInterval:  "15s",
+			EndpointLimit: 10,   // Default from Anker API reference
+			RequestDelay:  0.3,  // Default 300ms delay
 		},
 		Database: DatabaseConfig{
 			Host:           "localhost",
@@ -111,6 +116,21 @@ func LoadConfig(configPath string) (*Config, error) {
 	}
 	if v := os.Getenv("ANKER_POLL_INTERVAL"); v != "" {
 		config.Anker.PollInterval = v
+	}
+	if v := os.Getenv("ANKER_DEBUG"); v != "" {
+		config.Anker.Debug = v == "true" || v == "1"
+	}
+	if v := os.Getenv("ANKER_ENDPOINT_LIMIT"); v != "" {
+		var limit int
+		if _, err := fmt.Sscanf(v, "%d", &limit); err == nil {
+			config.Anker.EndpointLimit = limit
+		}
+	}
+	if v := os.Getenv("ANKER_REQUEST_DELAY"); v != "" {
+		var delay float64
+		if _, err := fmt.Sscanf(v, "%f", &delay); err == nil {
+			config.Anker.RequestDelay = delay
+		}
 	}
 	if v := os.Getenv("DB_HOST"); v != "" {
 		config.Database.Host = v
@@ -172,7 +192,7 @@ func (c *Config) Validate() error {
 	}
 	// When using client certificate authentication, user and password may be derived from the certificate
 	usingClientCert := c.Database.SSLCert != "" && c.Database.SSLKey != ""
-	
+
 	if !usingClientCert {
 		if c.Database.User == "" {
 			return fmt.Errorf("database user is required")
@@ -184,20 +204,20 @@ func (c *Config) Validate() error {
 	if c.Database.Database == "" {
 		return fmt.Errorf("database name is required")
 	}
-	
+
 	// Validate SSL certificate configuration
 	if c.Database.SSLCert != "" || c.Database.SSLKey != "" || c.Database.SSLRootCert != "" {
 		// If any certificate is provided, validate the configuration
 		if c.Database.SSLMode == "disable" {
 			return fmt.Errorf("sslmode cannot be 'disable' when SSL certificates are configured")
 		}
-		
+
 		// For client certificate auth, both cert and key are required
-		if (c.Database.SSLCert != "" && c.Database.SSLKey == "") || 
-		   (c.Database.SSLCert == "" && c.Database.SSLKey != "") {
+		if (c.Database.SSLCert != "" && c.Database.SSLKey == "") ||
+			(c.Database.SSLCert == "" && c.Database.SSLKey != "") {
 			return fmt.Errorf("both sslcert and sslkey must be provided for client certificate authentication")
 		}
-		
+
 		// Validate certificate files exist
 		if c.Database.SSLCert != "" {
 			if _, err := os.Stat(c.Database.SSLCert); err != nil {
@@ -215,7 +235,7 @@ func (c *Config) Validate() error {
 			}
 		}
 	}
-	
+
 	// Validate poll interval
 	if _, err := time.ParseDuration(c.Anker.PollInterval); err != nil {
 		return fmt.Errorf("invalid poll interval: %w", err)
@@ -238,12 +258,12 @@ func (c *Config) GetDSN() string {
 		c.Database.Database,
 		c.Database.SSLMode,
 	)
-	
+
 	// Only add password if it's set (not needed for certificate auth)
 	if c.Database.Password != "" {
 		dsn += fmt.Sprintf(" password=%s", c.Database.Password)
 	}
-	
+
 	// Add SSL certificate parameters if configured
 	if c.Database.SSLCert != "" {
 		dsn += fmt.Sprintf(" sslcert=%s", c.Database.SSLCert)
@@ -254,7 +274,7 @@ func (c *Config) GetDSN() string {
 	if c.Database.SSLRootCert != "" {
 		dsn += fmt.Sprintf(" sslrootcert=%s", c.Database.SSLRootCert)
 	}
-	
+
 	return dsn
 }
 
@@ -263,7 +283,7 @@ func (c *Config) GetTLSConfig() *DatabaseTLSConfig {
 	if c.Database.SSLCert == "" && c.Database.SSLKey == "" && c.Database.SSLRootCert == "" {
 		return &DatabaseTLSConfig{Enabled: false}
 	}
-	
+
 	return &DatabaseTLSConfig{
 		Enabled:      true,
 		CertFile:     c.Database.SSLCert,

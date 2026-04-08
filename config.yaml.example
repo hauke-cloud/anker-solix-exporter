@@ -14,6 +14,20 @@ anker:
   # How often to poll for new data (e.g., 5m, 10m, 1h)
   # Recommended: 5-10 minutes to respect API rate limits
   poll_interval: "5m"
+  
+  # Enable debug logging for Anker API requests/responses
+  # Set to true to see detailed API communication (useful for troubleshooting)
+  # WARNING: Debug logs may contain sensitive data
+  debug: false
+  
+  # Rate limiting configuration (based on Anker API limits)
+  # Maximum number of requests per endpoint per minute (0 to disable)
+  # Default: 10 (recommended to prevent API throttling)
+  endpoint_limit: 10
+  
+  # Minimum delay between any API requests in seconds
+  # Default: 0.3 (300ms, recommended for API stability)
+  request_delay: 0.3
 
 database:
   # TimescaleDB/PostgreSQL connection settings

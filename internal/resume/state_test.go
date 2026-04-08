@@ -79,7 +79,7 @@ func TestGetResumeTime(t *testing.T) {
 	// Test with no previous state
 	resumeTime := state.GetResumeTime(deviceKey, defaultLookback)
 	expectedTime := time.Now().Add(-defaultLookback)
-	
+
 	// Allow 1 second difference
 	if resumeTime.Sub(expectedTime).Abs() > time.Second {
 		t.Errorf("Expected resume time around %v, got %v", expectedTime, resumeTime)

@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   timescaledb:
@@ -30,7 +30,7 @@ services:
       - ANKER_EMAIL=${ANKER_EMAIL}
       - ANKER_PASSWORD=${ANKER_PASSWORD}
       - ANKER_COUNTRY=DE
-      - ANKER_POLL_INTERVAL=5m
+      - ANKER_POLL_INTERVAL=15s
       - DB_HOST=timescaledb
       - DB_PORT=5432
       - DB_USER=anker_exporter
@@ -42,7 +42,7 @@ services:
       # - DB_SSLCERT=/certs/client-cert.pem
       # - DB_SSLKEY=/certs/client-key.pem
       # - DB_SSLROOTCERT=/certs/ca-cert.pem
-      - LOG_LEVEL=info
+      - LOG_LEVEL=debug
       - RESUME_FILE=/data/last_export.json
     volumes:
       - exporter-data:/data

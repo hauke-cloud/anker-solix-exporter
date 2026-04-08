@@ -38,6 +38,7 @@ jobs:
         uses: dominikh/staticcheck-action@v1
         with:
           version: "latest"
+          install-go: false
 
   test-integration:
     name: Integration Tests

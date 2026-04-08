@@ -50,6 +50,10 @@ func TestRateLimiterEndpointLimit(t *testing.T) {
 }
 
 func TestRateLimiterMultipleEndpoints(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping rate limiter test in short mode")
+	}
+	
 	rl := NewRateLimiter()
 	rl.SetEndpointLimit(2)
 	rl.SetRequestDelay(0)
@@ -57,22 +61,47 @@ func TestRateLimiterMultipleEndpoints(t *testing.T) {
 	endpoint1 := "/endpoint/1"
 	endpoint2 := "/endpoint/2"
 	
-	// Each endpoint should have its own limit
-	rl.Wait(endpoint1)
-	rl.Wait(endpoint1)
-	rl.Wait(endpoint2)
-	rl.Wait(endpoint2)
+	// Test that each endpoint has its own independent limit
+	// We'll test them sequentially to avoid the 60s sleep affecting both
 	
-	// Both should throttle on 3rd request
+	// Test endpoint 1
+	rl.Wait(endpoint1)
+	time.Sleep(2 * time.Millisecond)
+	rl.Wait(endpoint1)
+	time.Sleep(2 * time.Millisecond)
+	
+	// 3rd request to endpoint 1 should throttle
+	start := time.Now()
 	throttle1 := rl.Wait(endpoint1)
-	throttle2 := rl.Wait(endpoint2)
+	elapsed := time.Since(start)
 	
 	if throttle1 == 0 {
-		t.Error("Endpoint 1 should be throttled")
+		t.Error("Endpoint 1 should be throttled on 3rd request")
 	}
+	// Should throttle for approximately the time remaining in the minute window
+	if elapsed < 50*time.Second {
+		t.Errorf("Endpoint 1 throttle time too short: %v (elapsed: %v)", throttle1, elapsed)
+	}
+	t.Logf("Endpoint 1 throttled for %v (elapsed: %v)", throttle1, elapsed)
+	
+	// Test endpoint 2 independently (fresh requests after endpoint1 throttle)
+	rl.Wait(endpoint2)
+	time.Sleep(2 * time.Millisecond)
+	rl.Wait(endpoint2)
+	time.Sleep(2 * time.Millisecond)
+	
+	// 3rd request to endpoint 2 should also throttle
+	start = time.Now()
+	throttle2 := rl.Wait(endpoint2)
+	elapsed = time.Since(start)
+	
 	if throttle2 == 0 {
-		t.Error("Endpoint 2 should be throttled")
+		t.Error("Endpoint 2 should be throttled on 3rd request")
 	}
+	if elapsed < 50*time.Second {
+		t.Errorf("Endpoint 2 throttle time too short: %v (elapsed: %v)", throttle2, elapsed)
+	}
+	t.Logf("Endpoint 2 throttled for %v (elapsed: %v)", throttle2, elapsed)
 }
 
 func TestRateLimiterRequestDelay(t *testing.T) {

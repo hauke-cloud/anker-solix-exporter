@@ -30,6 +30,7 @@ type Client struct {
 	sharedKey   []byte
 	logger      *zap.Logger
 	rateLimiter *RateLimiter
+	handler     *RequestHandler
 }
 
 // NewClient creates a new Anker API client with a no-op logger
@@ -64,6 +65,9 @@ func NewClientWithLogger(email, password, country string, logger *zap.Logger) *C
 			Timeout: time.Duration(DefaultRequestTimeout) * time.Second,
 		},
 	}
+
+	// Initialize request handler
+	client.handler = newRequestHandler(client)
 
 	// Generate ECDH key pair for password encryption
 	privateKey, sharedKey, err := generateECDHKeys()

@@ -3,39 +3,41 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
-	"gopkg.in/yaml.v3"
+	"github.com/spf13/viper"
 )
 
 type Config struct {
-	Anker    AnkerConfig    `yaml:"anker"`
-	Database DatabaseConfig `yaml:"database"`
-	Exporter ExporterConfig `yaml:"exporter"`
+	Anker    AnkerConfig    `mapstructure:"anker"`
+	Database DatabaseConfig `mapstructure:"database"`
+	Exporter ExporterConfig `mapstructure:"exporter"`
 }
 
 type AnkerConfig struct {
-	Email          string  `yaml:"email"`
-	Password       string  `yaml:"password"`
-	Country        string  `yaml:"country"`
-	PollInterval   string  `yaml:"poll_interval"`
-	Debug          bool    `yaml:"debug"` // Enable debug logging for Anker API
-	EndpointLimit  int     `yaml:"endpoint_limit"`  // Max requests per endpoint per minute (default: 10)
-	RequestDelay   float64 `yaml:"request_delay"`   // Minimum delay between requests in seconds (default: 0.3)
+	Email         string  `mapstructure:"email"`
+	Password      string  `mapstructure:"password"`
+	Country       string  `mapstructure:"country"`
+	PollInterval  string  `mapstructure:"poll_interval"`
+	Debug         bool    `mapstructure:"debug"`
+	EndpointLimit int     `mapstructure:"endpoint_limit"`
+	RequestDelay  float64 `mapstructure:"request_delay"`
 }
 
 type DatabaseConfig struct {
-	Host           string `yaml:"host"`
-	Port           int    `yaml:"port"`
-	User           string `yaml:"user"`
-	Password       string `yaml:"password"`
-	Database       string `yaml:"database"`
-	SSLMode        string `yaml:"sslmode"`
-	MigrationsPath string `yaml:"migrations_path"`
+	Host           string `mapstructure:"host"`
+	Port           int    `mapstructure:"port"`
+	User           string `mapstructure:"user"`
+	Password       string `mapstructure:"password"`
+	Database       string `mapstructure:"database"`
+	SSLMode        string `mapstructure:"sslmode"`
+	MigrationsPath string `mapstructure:"migrations_path"`
 	// TLS/SSL certificate configuration (optional)
-	SSLCert     string `yaml:"sslcert"`     // Path to client certificate
-	SSLKey      string `yaml:"sslkey"`      // Path to client key
-	SSLRootCert string `yaml:"sslrootcert"` // Path to CA certificate
+	SSLCert     string `mapstructure:"sslcert"`
+	SSLKey      string `mapstructure:"sslkey"`
+	SSLRootCert string `mapstructure:"sslrootcert"`
 }
 
 type DatabaseTLSConfig struct {
@@ -46,138 +48,158 @@ type DatabaseTLSConfig struct {
 }
 
 type ExporterConfig struct {
-	ResumeFile string `yaml:"resume_file"`
-	LogLevel   string `yaml:"log_level"`
+	ResumeFile string `mapstructure:"resume_file"`
+	LogLevel   string `mapstructure:"log_level"`
 }
 
-// LoadConfig loads configuration from file and environment variables
+// LoadConfig loads configuration from file and environment variables using Viper
 func LoadConfig(configPath string) (*Config, error) {
-	// Determine default migrations path
-	// Try container path first, fall back to local path
-	migrationsPath := "/etc/anker-solix-exporter/migrations"
-	if _, err := os.Stat(migrationsPath); os.IsNotExist(err) {
-		// Try relative path for local development
-		if _, err := os.Stat("migrations"); err == nil {
-			migrationsPath = "migrations"
-		} else if _, err := os.Stat("./migrations"); err == nil {
-			migrationsPath = "./migrations"
-		}
-	}
+	v := viper.New()
 
-	// Determine default resume file path
-	// Use /data for container, current dir for local development
-	resumeFile := "/data/last_export.json"
-	if _, err := os.Stat("/data"); os.IsNotExist(err) {
-		// Local development - use current directory
-		resumeFile = "last_export.json"
-	}
+	// Set default values for all configuration options
+	setDefaults(v)
 
-	config := &Config{
-		Anker: AnkerConfig{
-			Country:       "DE",
-			PollInterval:  "15s",
-			EndpointLimit: 10,   // Default from Anker API reference
-			RequestDelay:  0.3,  // Default 300ms delay
-		},
-		Database: DatabaseConfig{
-			Host:           "localhost",
-			Port:           5432,
-			SSLMode:        "disable",
-			MigrationsPath: migrationsPath,
-		},
-		Exporter: ExporterConfig{
-			ResumeFile: resumeFile,
-			LogLevel:   "info",
-		},
-	}
-
-	// Load from file if exists
+	// Configure Viper
+	v.SetConfigType("yaml")
+	
+	// If a config path is provided, use it
 	if configPath != "" {
-		data, err := os.ReadFile(configPath)
-		if err != nil && !os.IsNotExist(err) {
+		v.SetConfigFile(configPath)
+	} else {
+		// Search for config in multiple paths
+		v.SetConfigName("config")
+		v.AddConfigPath("/etc/anker-solix-exporter/")
+		v.AddConfigPath("$HOME/.anker-solix-exporter")
+		v.AddConfigPath(".")
+	}
+
+	// Read config file (optional - will use defaults if not found)
+	if err := v.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			// Config file was found but another error was produced
 			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
-		if err == nil {
-			if err := yaml.Unmarshal(data, config); err != nil {
-				return nil, fmt.Errorf("failed to parse config file: %w", err)
-			}
-		}
+		// Config file not found; will use defaults and environment variables
 	}
 
-	// Override with environment variables
-	if v := os.Getenv("ANKER_EMAIL"); v != "" {
-		config.Anker.Email = v
-	}
-	if v := os.Getenv("ANKER_PASSWORD"); v != "" {
-		config.Anker.Password = v
-	}
-	if v := os.Getenv("ANKER_COUNTRY"); v != "" {
-		config.Anker.Country = v
-	}
-	if v := os.Getenv("ANKER_POLL_INTERVAL"); v != "" {
-		config.Anker.PollInterval = v
-	}
-	if v := os.Getenv("ANKER_DEBUG"); v != "" {
-		config.Anker.Debug = v == "true" || v == "1"
-	}
-	if v := os.Getenv("ANKER_ENDPOINT_LIMIT"); v != "" {
-		var limit int
-		if _, err := fmt.Sscanf(v, "%d", &limit); err == nil {
-			config.Anker.EndpointLimit = limit
-		}
-	}
-	if v := os.Getenv("ANKER_REQUEST_DELAY"); v != "" {
-		var delay float64
-		if _, err := fmt.Sscanf(v, "%f", &delay); err == nil {
-			config.Anker.RequestDelay = delay
-		}
-	}
-	if v := os.Getenv("DB_HOST"); v != "" {
-		config.Database.Host = v
-	}
-	if v := os.Getenv("DB_PORT"); v != "" {
-		var port int
-		if _, err := fmt.Sscanf(v, "%d", &port); err == nil {
-			config.Database.Port = port
-		}
-	}
-	if v := os.Getenv("DB_USER"); v != "" {
-		config.Database.User = v
-	}
-	if v := os.Getenv("DB_PASSWORD"); v != "" {
-		config.Database.Password = v
-	}
-	if v := os.Getenv("DB_NAME"); v != "" {
-		config.Database.Database = v
-	}
-	if v := os.Getenv("DB_SSLMODE"); v != "" {
-		config.Database.SSLMode = v
-	}
-	if v := os.Getenv("DB_MIGRATIONS_PATH"); v != "" {
-		config.Database.MigrationsPath = v
-	}
-	if v := os.Getenv("DB_SSLCERT"); v != "" {
-		config.Database.SSLCert = v
-	}
-	if v := os.Getenv("DB_SSLKEY"); v != "" {
-		config.Database.SSLKey = v
-	}
-	if v := os.Getenv("DB_SSLROOTCERT"); v != "" {
-		config.Database.SSLRootCert = v
-	}
-	if v := os.Getenv("RESUME_FILE"); v != "" {
-		config.Exporter.ResumeFile = v
-	}
-	if v := os.Getenv("LOG_LEVEL"); v != "" {
-		config.Exporter.LogLevel = v
+	// Enable environment variable override
+	v.SetEnvPrefix("") // No prefix, use exact names
+	v.AutomaticEnv()
+	
+	// Replace dots and dashes in env var names with underscores
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
+
+	// Bind specific environment variables with custom names
+	bindEnvVariables(v)
+
+	// Unmarshal config into struct
+	var config Config
+	if err := v.Unmarshal(&config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	// Validate
+	// Validate configuration
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
 
-	return config, nil
+	return &config, nil
+}
+
+// setDefaults sets all default configuration values
+func setDefaults(v *viper.Viper) {
+	// Determine default migrations path
+	migrationsPath := detectMigrationsPath()
+	
+	// Determine default resume file path
+	resumeFile := detectResumeFilePath()
+
+	// Anker defaults
+	v.SetDefault("anker.country", "DE")
+	v.SetDefault("anker.poll_interval", "15s")
+	v.SetDefault("anker.debug", false)
+	v.SetDefault("anker.endpoint_limit", 10)
+	v.SetDefault("anker.request_delay", 0.3)
+
+	// Database defaults
+	v.SetDefault("database.host", "localhost")
+	v.SetDefault("database.port", 5432)
+	v.SetDefault("database.sslmode", "disable")
+	v.SetDefault("database.migrations_path", migrationsPath)
+
+	// Exporter defaults
+	v.SetDefault("exporter.resume_file", resumeFile)
+	v.SetDefault("exporter.log_level", "info")
+}
+
+// bindEnvVariables binds environment variables to config keys
+func bindEnvVariables(v *viper.Viper) {
+	// Anker configuration
+	v.BindEnv("anker.email", "ANKER_EMAIL")
+	v.BindEnv("anker.password", "ANKER_PASSWORD")
+	v.BindEnv("anker.country", "ANKER_COUNTRY")
+	v.BindEnv("anker.poll_interval", "ANKER_POLL_INTERVAL")
+	v.BindEnv("anker.debug", "ANKER_DEBUG")
+	v.BindEnv("anker.endpoint_limit", "ANKER_ENDPOINT_LIMIT")
+	v.BindEnv("anker.request_delay", "ANKER_REQUEST_DELAY")
+
+	// Database configuration
+	v.BindEnv("database.host", "DB_HOST")
+	v.BindEnv("database.port", "DB_PORT")
+	v.BindEnv("database.user", "DB_USER")
+	v.BindEnv("database.password", "DB_PASSWORD")
+	v.BindEnv("database.database", "DB_NAME")
+	v.BindEnv("database.sslmode", "DB_SSLMODE")
+	v.BindEnv("database.migrations_path", "DB_MIGRATIONS_PATH")
+	v.BindEnv("database.sslcert", "DB_SSLCERT")
+	v.BindEnv("database.sslkey", "DB_SSLKEY")
+	v.BindEnv("database.sslrootcert", "DB_SSLROOTCERT")
+
+	// Exporter configuration
+	v.BindEnv("exporter.resume_file", "RESUME_FILE")
+	v.BindEnv("exporter.log_level", "LOG_LEVEL")
+}
+
+// detectMigrationsPath determines the default migrations path
+func detectMigrationsPath() string {
+	// Try container path first
+	containerPath := "/etc/anker-solix-exporter/migrations"
+	if _, err := os.Stat(containerPath); err == nil {
+		return containerPath
+	}
+
+	// Try relative path for local development
+	if _, err := os.Stat("migrations"); err == nil {
+		return "migrations"
+	}
+	
+	if _, err := os.Stat("./migrations"); err == nil {
+		return "./migrations"
+	}
+
+	// Try to find migrations relative to executable
+	if execPath, err := os.Executable(); err == nil {
+		execDir := filepath.Dir(execPath)
+		migrationsPath := filepath.Join(execDir, "migrations")
+		if _, err := os.Stat(migrationsPath); err == nil {
+			return migrationsPath
+		}
+	}
+
+	// Fallback to container path
+	return containerPath
+}
+
+// detectResumeFilePath determines the default resume file path
+func detectResumeFilePath() string {
+	// Use /data for container environment
+	containerPath := "/data/last_export.json"
+	if _, err := os.Stat("/data"); err == nil {
+		return containerPath
+	}
+
+	// Local development - use current directory
+	return "last_export.json"
 }
 
 func (c *Config) Validate() error {

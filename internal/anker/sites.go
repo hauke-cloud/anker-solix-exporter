@@ -1,9 +1,7 @@
 package anker
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 
 	"go.uber.org/zap"
 )
@@ -12,27 +10,9 @@ import (
 func (c *Client) GetSites() ([]Site, error) {
 	c.debugLog("Fetching site list")
 	
-	resp, err := c.doRequest("POST", EndpointSiteList, nil, true)
-	if err != nil {
-		return nil, fmt.Errorf("get sites request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Read the response body
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	c.debugLog("GetSites response received", zap.Int("response_size", len(bodyBytes)))
-
 	var sitesResp SiteListResponse
-	if err := json.Unmarshal(bodyBytes, &sitesResp); err != nil {
-		return nil, fmt.Errorf("failed to decode sites response: %w", err)
-	}
-
-	if sitesResp.Code != 0 {
-		return nil, fmt.Errorf("get sites failed: %s (code: %d)", sitesResp.Msg, sitesResp.Code)
+	if err := c.handler.execute("POST", EndpointSiteList, nil, &sitesResp, true); err != nil {
+		return nil, fmt.Errorf("get sites failed: %w", err)
 	}
 
 	// Fetch device details for each site using get_scen_info
@@ -77,37 +57,11 @@ func (c *Client) getSceneInfo(siteID string) ([]Device, error) {
 		SiteID: siteID,
 	}
 
-	body, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal scene info request: %w", err)
-	}
-
 	c.debugLog("Fetching scene info", zap.String("site_id", siteID))
 
-	resp, err := c.doRequest("POST", EndpointSceneInfo, body, true)
-	if err != nil {
-		return nil, fmt.Errorf("get scene info request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Read the response body
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	c.debugLog("GetSceneInfo response received",
-		zap.String("site_id", siteID),
-		zap.Int("response_size", len(bodyBytes)),
-	)
-
 	var sceneResp SceneInfoResponse
-	if err := json.Unmarshal(bodyBytes, &sceneResp); err != nil {
-		return nil, fmt.Errorf("failed to decode scene info response: %w", err)
-	}
-
-	if sceneResp.Code != 0 {
-		return nil, fmt.Errorf("get scene info failed: %s (code: %d)", sceneResp.Msg, sceneResp.Code)
+	if err := c.handler.execute("POST", EndpointSceneInfo, reqBody, &sceneResp, true); err != nil {
+		return nil, fmt.Errorf("get scene info failed: %w", err)
 	}
 
 	// Combine solar_list and solarbank_list into a single device list

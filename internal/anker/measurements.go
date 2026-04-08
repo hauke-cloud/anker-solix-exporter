@@ -1,9 +1,7 @@
 package anker
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"time"
 
 	"go.uber.org/zap"
@@ -15,36 +13,11 @@ func (c *Client) GetCurrentMeasurements(siteID string) ([]Measurement, error) {
 		SiteID: siteID,
 	}
 
-	body, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal scene info request: %w", err)
-	}
-
 	c.debugLog("Fetching current measurements", zap.String("site_id", siteID))
 
-	resp, err := c.doRequest("POST", EndpointSceneInfo, body, true)
-	if err != nil {
-		return nil, fmt.Errorf("get scene info request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	c.debugLog("GetCurrentMeasurements response received",
-		zap.String("site_id", siteID),
-		zap.Int("response_size", len(bodyBytes)),
-	)
-
 	var sceneResp SceneInfoResponse
-	if err := json.Unmarshal(bodyBytes, &sceneResp); err != nil {
-		return nil, fmt.Errorf("failed to decode scene info response: %w", err)
-	}
-
-	if sceneResp.Code != 0 {
-		return nil, fmt.Errorf("get scene info failed: %s (code: %d)", sceneResp.Msg, sceneResp.Code)
+	if err := c.handler.execute("POST", EndpointSceneInfo, reqBody, &sceneResp, true); err != nil {
+		return nil, fmt.Errorf("get scene info failed: %w", err)
 	}
 
 	now := time.Now()

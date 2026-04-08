@@ -15,8 +15,7 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	Code int    `json:"code"`
-	Msg  string `json:"msg"`
+	BaseResponse
 	Data struct {
 		UserID    string `json:"user_id"`
 		AuthToken string `json:"auth_token"`
@@ -27,8 +26,7 @@ type LoginResponse struct {
 }
 
 type SiteListResponse struct {
-	Code int    `json:"code"`
-	Msg  string `json:"msg"`
+	BaseResponse
 	Data struct {
 		SiteList []Site `json:"site_list"`
 	} `json:"data"`
@@ -39,8 +37,7 @@ type SceneInfoRequest struct {
 }
 
 type SceneInfoResponse struct {
-	Code int    `json:"code"`
-	Msg  string `json:"msg"`
+	BaseResponse
 	Data struct {
 		SiteID        string `json:"site_id"`
 		SiteName      string `json:"site_name"`
@@ -61,8 +58,7 @@ type EnergyDataRequest struct {
 }
 
 type EnergyDataResponse struct {
-	Code int    `json:"code"`
-	Msg  string `json:"msg"`
+	BaseResponse
 	Data struct {
 		Power                   []PowerData `json:"power"`
 		ChargeTotal             string      `json:"charge_total"`

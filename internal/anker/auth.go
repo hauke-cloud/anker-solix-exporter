@@ -2,7 +2,6 @@ package anker
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -42,24 +41,9 @@ func (c *Client) Login() error {
 		Transaction: transaction,
 	}
 
-	body, err := json.Marshal(reqBody)
-	if err != nil {
-		return fmt.Errorf("failed to marshal login request: %w", err)
-	}
-
-	resp, err := c.doRequest("POST", EndpointLogin, body, false)
-	if err != nil {
-		return fmt.Errorf("login request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
 	var loginResp LoginResponse
-	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
-		return fmt.Errorf("failed to decode login response: %w", err)
-	}
-
-	if loginResp.Code != 0 {
-		return fmt.Errorf("login failed: %s (code: %d)", loginResp.Msg, loginResp.Code)
+	if err := c.handler.execute("POST", EndpointLogin, reqBody, &loginResp, false); err != nil {
+		return fmt.Errorf("login failed: %w", err)
 	}
 
 	c.authToken = loginResp.Data.AuthToken

@@ -18,12 +18,24 @@ func skipIfDockerNotAvailable(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
+	// Try to access Docker - if we can't, skip the test instead of panicking
+	// This prevents test failures when Docker is unavailable or user lacks permissions
+	defer func() {
+		if r := recover(); r != nil {
+			t.Skipf("Docker not available or insufficient permissions: %v", r)
+		}
+	}()
+
 	// Check if Docker is available via DOCKER_HOST or socket
 	dockerHost := os.Getenv("DOCKER_HOST")
 	if dockerHost == "" {
 		// Check for common Docker socket locations
 		if _, err := os.Stat("/var/run/docker.sock"); err != nil {
 			t.Skip("Docker not available (no socket found)")
+		}
+		// Check if we can actually access the socket
+		if _, err := os.Open("/var/run/docker.sock"); err != nil {
+			t.Skipf("Docker socket exists but not accessible: %v", err)
 		}
 	}
 }

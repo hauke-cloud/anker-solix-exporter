@@ -126,7 +126,7 @@ configFile:
       email: user@example.com
       password: password
       country: DE
-      poll_interval: 5m
+      poll_interval: 15s
     database:
       host: timescaledb
       port: 5432

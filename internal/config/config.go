@@ -75,11 +75,14 @@ func LoadConfig(configPath string) (*Config, error) {
 
 	// Read config file (optional - will use defaults if not found)
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			// Config file not found; will use defaults and environment variables
+		} else if os.IsNotExist(err) {
+			// File path doesn't exist; will use defaults and environment variables
+		} else {
 			// Config file was found but another error was produced
 			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
-		// Config file not found; will use defaults and environment variables
 	}
 
 	// Enable environment variable override

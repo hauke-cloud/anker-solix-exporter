@@ -83,3 +83,6 @@ ALTER TABLE measurements_new RENAME TO measurements;
 -- Rename indexes to match new table name
 ALTER INDEX idx_measurements_new_timestamp RENAME TO idx_measurements_timestamp;
 ALTER INDEX idx_measurements_new_device_sn RENAME TO idx_measurements_device_sn;
+
+-- Rename sequence to match new table name
+ALTER SEQUENCE measurements_new_id_seq RENAME TO measurements_id_seq;

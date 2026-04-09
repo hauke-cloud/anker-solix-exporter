@@ -58,6 +58,9 @@ ALTER TABLE measurements_old RENAME TO measurements;
 ALTER INDEX idx_measurements_old_timestamp RENAME TO idx_measurements_timestamp;
 ALTER INDEX idx_measurements_old_site_device RENAME TO idx_measurements_site_device;
 
+-- Rename sequence to match old table name
+ALTER SEQUENCE measurements_old_id_seq RENAME TO measurements_id_seq;
+
 -- Drop normalized tables
 DROP TABLE IF EXISTS devices CASCADE;
 DROP TABLE IF EXISTS sites CASCADE;

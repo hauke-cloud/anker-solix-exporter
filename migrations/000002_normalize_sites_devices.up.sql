@@ -36,11 +36,11 @@ FROM measurements m
 GROUP BY m.site_id, m.device_sn, m.device_name, m.device_type
 ON CONFLICT (device_sn) DO NOTHING;
 
--- Create new normalized measurements table
+-- Create new normalized measurements table (without foreign key initially)
 CREATE TABLE IF NOT EXISTS measurements_new (
     id BIGSERIAL NOT NULL,
     timestamp TIMESTAMPTZ NOT NULL,
-    device_sn VARCHAR(255) NOT NULL REFERENCES devices(device_sn) ON DELETE CASCADE,
+    device_sn VARCHAR(255) NOT NULL,
     solar_power DOUBLE PRECISION,
     output_power DOUBLE PRECISION,
     grid_power DOUBLE PRECISION,
@@ -86,3 +86,7 @@ ALTER INDEX idx_measurements_new_device_sn RENAME TO idx_measurements_device_sn;
 
 -- Rename sequence to match new table name
 ALTER SEQUENCE measurements_new_id_seq RENAME TO measurements_id_seq;
+
+-- Add foreign key constraint after renaming (to avoid constraint name issues with hypertable chunks)
+ALTER TABLE measurements ADD CONSTRAINT measurements_device_sn_fkey 
+    FOREIGN KEY (device_sn) REFERENCES devices(device_sn) ON DELETE CASCADE;

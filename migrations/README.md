@@ -4,24 +4,57 @@ This directory contains database migrations for the Anker Solix Exporter Timesca
 
 ## Overview
 
-Migrations are automatically run on application startup using golang-migrate. The migrations create and configure a TimescaleDB hypertable for storing energy measurements.
+Migrations are automatically run on application startup using golang-migrate. The migrations create and configure a normalized TimescaleDB schema with separate sites, devices, and measurements tables.
 
 ## Migration Files
 
-- `000001_create_measurements_table.up.sql` - Creates the measurements table with TimescaleDB hypertable, indexes, compression, and retention policies
+- `000001_create_measurements_table.up.sql` - Creates the initial measurements table with TimescaleDB hypertable, indexes, compression, and retention policies
 - `000001_create_measurements_table.down.sql` - Removes the measurements table and all policies
+- `000002_normalize_sites_devices.up.sql` - Normalizes the database by adding sites and devices tables, migrating data, and updating the measurements table structure
+- `000002_normalize_sites_devices.down.sql` - Reverts to the denormalized structure
+
+## Schema Structure
+
+After running all migrations, the database will have the following normalized structure:
+
+### Sites Table
+Stores information about site locations:
+- `id` - Auto-incrementing primary key
+- `site_id` - Unique site identifier from Anker API
+- `site_name` - Human-readable site name
+- `created_at`, `updated_at` - Timestamps
+
+### Devices Table
+Stores information about devices at sites:
+- `id` - Auto-incrementing primary key
+- `site_id` - Foreign key to sites table
+- `device_sn` - Unique device serial number
+- `device_name` - Human-readable device name
+- `device_type` - Type of device (e.g., "solarbank", "solar")
+- `created_at`, `updated_at` - Timestamps
+
+### Measurements Table
+Stores time-series energy measurements:
+- `id` - Auto-incrementing primary key
+- `timestamp` - Measurement timestamp (hypertable partition key)
+- `device_sn` - Foreign key to devices table
+- `solar_power`, `output_power`, `grid_power`, `battery_power`, `battery_soc` - Energy metrics
+- `created_at` - Record creation timestamp
 
 ## Features
 
 The migration sets up:
 
-1. **Measurements Table**: Stores energy data from Anker Solix devices
-2. **TimescaleDB Hypertable**: Optimized for time-series data storage
-3. **Indexes**: 
-   - Time-based index for efficient range queries
-   - Composite index on site_id, device_sn, and timestamp
-4. **Compression**: Automatic compression of data older than 7 days
-5. **Retention**: Automatic deletion of data older than 2 years
+1. **Normalized Schema**: Eliminates data redundancy by separating sites, devices, and measurements
+2. **TimescaleDB Hypertable**: Optimized for time-series data storage on the measurements table
+3. **Foreign Key Constraints**: Maintains referential integrity between tables
+4. **Indexes**: 
+   - Time-based index on measurements for efficient range queries
+   - Device index on measurements for fast device-specific queries
+   - Unique constraints on site_id and device_sn
+5. **Compression**: Automatic compression of measurement data older than 7 days
+6. **Retention**: Automatic deletion of measurement data older than 2 years
+7. **Data Migration**: Existing data is automatically migrated to the new normalized structure
 
 ## Manual Migration
 
@@ -37,7 +70,10 @@ go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@lat
 # Run migrations
 migrate -database "${DATABASE_URL}" -path migrations up
 
-# Rollback
+# Rollback one migration
+migrate -database "${DATABASE_URL}" -path migrations down 1
+
+# Rollback all migrations
 migrate -database "${DATABASE_URL}" -path migrations down
 ```
 

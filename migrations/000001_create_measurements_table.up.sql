@@ -21,13 +21,16 @@ CREATE INDEX IF NOT EXISTS idx_measurements_timestamp ON measurements(timestamp 
 CREATE INDEX IF NOT EXISTS idx_measurements_site_device ON measurements(site_id, device_sn, timestamp DESC);
 
 -- Enable TimescaleDB hypertable
--- Note: Using DO block to make this idempotent
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM timescaledb_information.hypertables
-        WHERE hypertable_name = 'measurements'
-    ) THEN
-        PERFORM create_hypertable('measurements', 'timestamp');
-    END IF;
-END $$;
+SELECT create_hypertable('measurements', 'timestamp', if_not_exists => TRUE);
+
+-- Set up compression policy (compress data older than 7 days)
+ALTER TABLE measurements SET (
+    timescaledb.compress,
+    timescaledb.compress_segmentby = 'site_id,device_sn',
+    timescaledb.compress_orderby = 'timestamp DESC'
+);
+
+SELECT add_compression_policy('measurements', INTERVAL '7 days', if_not_exists => TRUE);
+
+-- Set up retention policy (keep data for 2 years)
+SELECT add_retention_policy('measurements', INTERVAL '2 years', if_not_exists => TRUE);

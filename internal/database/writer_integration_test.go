@@ -161,8 +161,8 @@ func TestWriterIntegration(t *testing.T) {
 			t.Fatalf("failed to batch write measurements: %s", err)
 		}
 
-		// Verify all were written using helper
-		testDB.AssertCountWhere(t, 250, "site_id = ? AND device_sn = ?", "site3", "device3")
+		// Verify all were written using helper - query by device_sn only
+		testDB.AssertCountWhere(t, 250, "device_sn = ?", "device3")
 	})
 
 	// Test empty measurements slice
@@ -211,11 +211,15 @@ func TestMeasurementModel(t *testing.T) {
 	t.Run("BeforeCreateHook", func(t *testing.T) {
 		testDB.Reset(t)
 
+		// Create site and device first
+		site := database.Site{SiteID: "site1", SiteName: "Test Site"}
+		testDB.Writer.GetDB().Create(&site)
+
+		device := database.Device{SiteID: "site1", DeviceSN: "device1", DeviceName: "Test Device", DeviceType: "solarbank"}
+		testDB.Writer.GetDB().Create(&device)
+
 		m := &database.Measurement{
-			SiteID:     "site1",
-			SiteName:   "Test Site",
-			DeviceSN:   "device1",
-			DeviceName: "Test Device",
+			DeviceSN: "device1",
 		}
 
 		// Create without setting Timestamp
@@ -237,9 +241,9 @@ func TestMeasurementModel(t *testing.T) {
 			t.Error("expected timestamp index to exist")
 		}
 
-		// Check site_device index
-		if !testDB.HasIndexLike(t, "%site_device%") {
-			t.Error("expected site_device index to exist")
+		// Check device_sn index
+		if !testDB.HasIndexLike(t, "%device_sn%") {
+			t.Error("expected device_sn index to exist")
 		}
 	})
 }
@@ -262,12 +266,15 @@ func TestHelperFunctions(t *testing.T) {
 
 		// Create with overrides
 		m2 := testDB.CreateTestMeasurement(t, func(m *database.Measurement) {
-			m.SiteID = "custom-site"
+			m.DeviceSN = "custom-device"
 			m.SolarPower = 999.9
 		})
 
-		if m2.SiteID != "custom-site" {
-			t.Errorf("expected SiteID to be 'custom-site', got '%s'", m2.SiteID)
+		// Need to create the custom device first
+		testDB.Writer.GetDB().Create(&database.Device{SiteID: "test-site", DeviceSN: "custom-device", DeviceName: "Custom Device", DeviceType: "solarbank"})
+
+		if m2.DeviceSN != "custom-device" {
+			t.Errorf("expected DeviceSN to be 'custom-device', got '%s'", m2.DeviceSN)
 		}
 		if m2.SolarPower != 999.9 {
 			t.Errorf("expected SolarPower to be 999.9, got %f", m2.SolarPower)
@@ -289,11 +296,16 @@ func TestHelperFunctions(t *testing.T) {
 
 		// Create with overrides
 		testDB.Reset(t)
+		
+		// Create a site and device for the test
+		testDB.Writer.GetDB().Create(&database.Site{SiteID: "same-site", SiteName: "Same Site"})
+		testDB.Writer.GetDB().Create(&database.Device{SiteID: "same-site", DeviceSN: "same-device", DeviceName: "Same Device", DeviceType: "solarbank"})
+		
 		testDB.CreateTestMeasurements(t, 5, func(i int, m *database.Measurement) {
-			m.SiteID = "same-site"
+			m.DeviceSN = "same-device"
 		})
 
-		testDB.AssertCountWhere(t, 5, "site_id = ?", "same-site")
+		testDB.AssertCountWhere(t, 5, "device_sn = ?", "same-device")
 	})
 
 	t.Run("GetMeasurements", func(t *testing.T) {
@@ -310,17 +322,31 @@ func TestHelperFunctions(t *testing.T) {
 	t.Run("GetMeasurementsWhere", func(t *testing.T) {
 		testDB.Reset(t)
 
+		// Create sites first
+		testDB.Writer.GetDB().Create(&database.Site{SiteID: "site-a", SiteName: "Site A"})
+		testDB.Writer.GetDB().Create(&database.Site{SiteID: "site-b", SiteName: "Site B"})
+
+		// Create devices
+		testDB.Writer.GetDB().Create(&database.Device{SiteID: "site-a", DeviceSN: "device-a1", DeviceName: "Device A1", DeviceType: "solarbank"})
+		testDB.Writer.GetDB().Create(&database.Device{SiteID: "site-b", DeviceSN: "device-b1", DeviceName: "Device B1", DeviceType: "solarbank"})
+		testDB.Writer.GetDB().Create(&database.Device{SiteID: "site-a", DeviceSN: "device-a2", DeviceName: "Device A2", DeviceType: "solarbank"})
+
 		testDB.CreateTestMeasurement(t, func(m *database.Measurement) {
-			m.SiteID = "site-a"
+			m.DeviceSN = "device-a1"
 		})
 		testDB.CreateTestMeasurement(t, func(m *database.Measurement) {
-			m.SiteID = "site-b"
+			m.DeviceSN = "device-b1"
 		})
 		testDB.CreateTestMeasurement(t, func(m *database.Measurement) {
-			m.SiteID = "site-a"
+			m.DeviceSN = "device-a2"
 		})
 
-		measurements := testDB.GetMeasurementsWhere(t, "site_id = ?", "site-a")
+		// Query by joining with devices table
+		var measurements []database.Measurement
+		testDB.Writer.GetDB().Joins("JOIN devices ON devices.device_sn = measurements.device_sn").
+			Where("devices.site_id = ?", "site-a").
+			Find(&measurements)
+
 		if len(measurements) != 2 {
 			t.Errorf("expected 2 measurements for site-a, got %d", len(measurements))
 		}

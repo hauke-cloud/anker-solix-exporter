@@ -84,27 +84,32 @@ func RunMigrations(db *gorm.DB, migrationsPath string, logger *zap.Logger) error
 
 // verifyTablesExist checks that critical tables exist in the database
 func verifyTablesExist(db *gorm.DB, logger *zap.Logger) error {
-	var exists bool
+	tables := []string{"sites", "devices", "measurements"}
 	
-	// Check if measurements table exists
-	err := db.Raw(`
-		SELECT EXISTS (
-			SELECT FROM information_schema.tables 
-			WHERE table_schema = 'public' 
-			AND table_name = 'measurements'
-		)
-	`).Scan(&exists).Error
-	
-	if err != nil {
-		return fmt.Errorf("failed to check if measurements table exists: %w", err)
+	for _, tableName := range tables {
+		var exists bool
+		err := db.Raw(`
+			SELECT EXISTS (
+				SELECT FROM information_schema.tables 
+				WHERE table_schema = 'public' 
+				AND table_name = $1
+			)
+		`, tableName).Scan(&exists).Error
+		
+		if err != nil {
+			return fmt.Errorf("failed to check if %s table exists: %w", tableName, err)
+		}
+		
+		if !exists {
+			logger.Error("table does not exist despite migrations being marked as complete",
+				zap.String("table", tableName),
+				zap.String("hint", "database may be in inconsistent state - reset migrations with: DELETE FROM schema_migrations; then restart"))
+			return fmt.Errorf("%s table does not exist - please reset migration state and restart", tableName)
+		}
+		
+		logger.Debug("table verified", zap.String("table", tableName))
 	}
 	
-	if !exists {
-		logger.Error("measurements table does not exist despite migrations being marked as complete",
-			zap.String("hint", "database may be in inconsistent state - reset migrations with: DELETE FROM schema_migrations; then restart"))
-		return fmt.Errorf("measurements table does not exist - please reset migration state and restart")
-	}
-	
-	logger.Info("database verification passed", zap.Bool("measurements_table_exists", exists))
+	logger.Info("database verification passed", zap.Strings("tables", tables))
 	return nil
 }

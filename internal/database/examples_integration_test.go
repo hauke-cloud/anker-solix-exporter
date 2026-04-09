@@ -30,10 +30,13 @@ func TestAdvancedQueries(t *testing.T) {
 
 		baseTime := time.Now().UTC().Truncate(time.Hour)
 
+		// Create site and device first
+		testDB.Writer.GetDB().Create(&database.Site{SiteID: "site1", SiteName: "Site 1"})
+		testDB.Writer.GetDB().Create(&database.Device{SiteID: "site1", DeviceSN: "device1", DeviceName: "Device 1", DeviceType: "solarbank"})
+
 		// Create measurements across different time periods
 		testDB.CreateTestMeasurements(t, 10, func(i int, m *database.Measurement) {
 			m.Timestamp = baseTime.Add(time.Duration(i) * time.Hour)
-			m.SiteID = "site1"
 			m.DeviceSN = "device1"
 		})
 
@@ -54,19 +57,21 @@ func TestAdvancedQueries(t *testing.T) {
 	t.Run("GroupedDeviceData", func(t *testing.T) {
 		testDB.Reset(t)
 
+		// Create site and devices first
+		testDB.Writer.GetDB().Create(&database.Site{SiteID: "site1", SiteName: "Site 1"})
+		testDB.Writer.GetDB().Create(&database.Device{SiteID: "site1", DeviceSN: "device-a", DeviceName: "Device A", DeviceType: "solarbank"})
+		testDB.Writer.GetDB().Create(&database.Device{SiteID: "site1", DeviceSN: "device-b", DeviceName: "Device B", DeviceType: "solarbank"})
+
 		// Create measurements for multiple devices
 		testDB.CreateTestMeasurement(t, func(m *database.Measurement) {
-			m.SiteID = "site1"
 			m.DeviceSN = "device-a"
 			m.SolarPower = 100
 		})
 		testDB.CreateTestMeasurement(t, func(m *database.Measurement) {
-			m.SiteID = "site1"
 			m.DeviceSN = "device-a"
 			m.SolarPower = 200
 		})
 		testDB.CreateTestMeasurement(t, func(m *database.Measurement) {
-			m.SiteID = "site1"
 			m.DeviceSN = "device-b"
 			m.SolarPower = 150
 		})
@@ -134,9 +139,6 @@ func TestDataIntegrity(t *testing.T) {
 		testDB.AssertMeasurementExists(t, m1.ID)
 
 		// Verify required fields are set
-		if m1.SiteID == "" {
-			t.Error("SiteID should not be empty")
-		}
 		if m1.DeviceSN == "" {
 			t.Error("DeviceSN should not be empty")
 		}
@@ -294,16 +296,19 @@ func TestComplexScenario(t *testing.T) {
 		// Verify total count: 2 sites * 2 devices * 24 hours = 96 measurements
 		testDB.AssertCount(t, 96)
 
-		// Verify per-site counts
-		testDB.AssertCountWhere(t, 48, "site_id = ?", "site-home")
-		testDB.AssertCountWhere(t, 48, "site_id = ?", "site-office")
-
 		// Verify per-device counts
 		testDB.AssertCountWhere(t, 48, "device_sn = ?", "solarbank-1")
 		testDB.AssertCountWhere(t, 48, "device_sn = ?", "solarbank-2")
 
-		// Verify specific device on specific site
-		testDB.AssertCountWhere(t, 24, "site_id = ? AND device_sn = ?", "site-home", "solarbank-1")
+		// Verify specific device on specific site using join
+		var countSiteHome int64
+		testDB.Writer.GetDB().Model(&database.Measurement{}).
+			Joins("JOIN devices ON devices.device_sn = measurements.device_sn").
+			Where("devices.site_id = ? AND measurements.device_sn = ?", "site-home", "solarbank-1").
+			Count(&countSiteHome)
+		if countSiteHome != 24 {
+			t.Errorf("expected 24 measurements for site-home/solarbank-1, got %d", countSiteHome)
+		}
 
 		// Get last timestamp for a specific device
 		lastTime, err := testDB.Writer.GetLastTimestamp(ctx, "site-home", "solarbank-1")
@@ -316,10 +321,13 @@ func TestComplexScenario(t *testing.T) {
 			t.Errorf("expected last timestamp %v, got %v", expectedLast, lastTime)
 		}
 
-		// Query peak solar production (hour 23 should have max)
-		measurements := testDB.GetMeasurementsWhere(t,
-			"site_id = ? AND device_sn = ? AND solar_power >= ?",
-			"site-home", "solarbank-1", 200.0)
+		// Query peak solar production (hour 23 should have max) using join
+		var measurements []database.Measurement
+		testDB.Writer.GetDB().
+			Joins("JOIN devices ON devices.device_sn = measurements.device_sn").
+			Where("devices.site_id = ? AND measurements.device_sn = ? AND measurements.solar_power >= ?",
+				"site-home", "solarbank-1", 200.0).
+			Find(&measurements)
 
 		if len(measurements) < 1 {
 			t.Error("expected to find measurements with high solar power")

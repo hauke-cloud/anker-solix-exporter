@@ -65,16 +65,17 @@ func (w *Writer) WriteMeasurements(ctx context.Context, measurements []anker.Mea
 		return nil
 	}
 
+	// First, ensure sites and devices exist
+	if err := w.ensureSitesAndDevices(ctx, measurements); err != nil {
+		return fmt.Errorf("failed to ensure sites and devices: %w", err)
+	}
+
 	// Convert to database models
 	dbMeasurements := make([]Measurement, len(measurements))
 	for i, m := range measurements {
 		dbMeasurements[i] = Measurement{
 			Timestamp:    m.Timestamp,
-			SiteID:       m.SiteID,
-			SiteName:     m.SiteName,
 			DeviceSN:     m.DeviceSN,
-			DeviceName:   m.DeviceName,
-			DeviceType:   m.DeviceType,
 			SolarPower:   m.SolarPower,
 			OutputPower:  m.OutputPower,
 			GridPower:    m.GridPower,
@@ -96,12 +97,74 @@ func (w *Writer) WriteMeasurements(ctx context.Context, measurements []anker.Mea
 	return nil
 }
 
+// ensureSitesAndDevices ensures that sites and devices exist in the database
+func (w *Writer) ensureSitesAndDevices(ctx context.Context, measurements []anker.Measurement) error {
+	// Collect unique sites and devices
+	sitesMap := make(map[string]string) // siteID -> siteName
+	devicesMap := make(map[string]struct {
+		siteID     string
+		deviceName string
+		deviceType string
+	})
+
+	for _, m := range measurements {
+		sitesMap[m.SiteID] = m.SiteName
+		devicesMap[m.DeviceSN] = struct {
+			siteID     string
+			deviceName string
+			deviceType string
+		}{
+			siteID:     m.SiteID,
+			deviceName: m.DeviceName,
+			deviceType: m.DeviceType,
+		}
+	}
+
+	// Upsert sites
+	for siteID, siteName := range sitesMap {
+		site := Site{
+			SiteID:   siteID,
+			SiteName: siteName,
+		}
+		result := w.db.WithContext(ctx).
+			Where(Site{SiteID: siteID}).
+			Assign(Site{SiteName: siteName}).
+			FirstOrCreate(&site)
+		if result.Error != nil {
+			return fmt.Errorf("failed to upsert site %s: %w", siteID, result.Error)
+		}
+	}
+
+	// Upsert devices
+	for deviceSN, deviceInfo := range devicesMap {
+		device := Device{
+			SiteID:     deviceInfo.siteID,
+			DeviceSN:   deviceSN,
+			DeviceName: deviceInfo.deviceName,
+			DeviceType: deviceInfo.deviceType,
+		}
+		result := w.db.WithContext(ctx).
+			Where(Device{DeviceSN: deviceSN}).
+			Assign(Device{
+				SiteID:     deviceInfo.siteID,
+				DeviceName: deviceInfo.deviceName,
+				DeviceType: deviceInfo.deviceType,
+			}).
+			FirstOrCreate(&device)
+		if result.Error != nil {
+			return fmt.Errorf("failed to upsert device %s: %w", deviceSN, result.Error)
+		}
+	}
+
+	return nil
+}
+
 // GetLastTimestamp retrieves the latest timestamp for a specific device
 func (w *Writer) GetLastTimestamp(ctx context.Context, siteID, deviceSN string) (time.Time, error) {
 	var measurement Measurement
 
 	result := w.db.WithContext(ctx).
-		Where("site_id = ? AND device_sn = ?", siteID, deviceSN).
+		Where("device_sn = ?", deviceSN).
 		Order("timestamp DESC").
 		First(&measurement)
 

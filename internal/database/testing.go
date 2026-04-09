@@ -263,7 +263,7 @@ func (td *TestDatabase) AssertEmpty(t *testing.T) {
 func (td *TestDatabase) CreateTestMeasurement(t *testing.T, overrides ...func(*Measurement)) *Measurement {
 	t.Helper()
 
-	// First ensure site and device exist
+	// Default values
 	siteID := "test-site"
 	siteName := "Test Site"
 	deviceSN := "test-device"
@@ -280,10 +280,13 @@ func (td *TestDatabase) CreateTestMeasurement(t *testing.T, overrides ...func(*M
 		BatterySoC:   75.0,
 	}
 
-	// Apply overrides
+	// Apply overrides first to get the final device_sn
 	for _, override := range overrides {
 		override(m)
 	}
+
+	// Use the device_sn from the measurement (after overrides)
+	deviceSN = m.DeviceSN
 
 	// Create site and device if they don't exist
 	site := Site{SiteID: siteID, SiteName: siteName}

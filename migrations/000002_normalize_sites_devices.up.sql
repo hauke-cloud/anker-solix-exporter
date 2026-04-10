@@ -55,7 +55,7 @@ CREATE INDEX IF NOT EXISTS idx_measurements_new_timestamp ON measurements_new(ti
 CREATE INDEX IF NOT EXISTS idx_measurements_new_device_sn ON measurements_new(device_sn, timestamp DESC);
 
 -- Enable TimescaleDB hypertable for new measurements table
-SELECT create_hypertable('measurements_new', 'timestamp', if_not_exists => TRUE);
+SELECT create_hypertable('measurements_new', 'timestamp', if_not_exists := TRUE);
 
 -- Migrate data from old measurements table to new one
 INSERT INTO measurements_new (id, timestamp, device_sn, solar_power, output_power, grid_power, battery_power, battery_soc, created_at)
@@ -69,10 +69,10 @@ ALTER TABLE measurements_new SET (
     timescaledb.compress_orderby = 'timestamp DESC'
 );
 
-SELECT add_compression_policy('measurements_new', INTERVAL '7 days', if_not_exists => TRUE);
+SELECT add_compression_policy('measurements_new', INTERVAL '7 days', if_not_exists := TRUE);
 
 -- Set up retention policy for new measurements table (keep data for 2 years)
-SELECT add_retention_policy('measurements_new', INTERVAL '2 years', if_not_exists => TRUE);
+SELECT add_retention_policy('measurements_new', INTERVAL '2 years', if_not_exists := TRUE);
 
 -- Drop old measurements table
 DROP TABLE IF EXISTS measurements CASCADE;

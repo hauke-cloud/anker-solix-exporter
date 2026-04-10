@@ -1,3 +1,6 @@
+-- Enable TimescaleDB extension
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+
 -- Create measurements table
 CREATE TABLE IF NOT EXISTS measurements (
     id BIGSERIAL NOT NULL,
@@ -21,7 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_measurements_timestamp ON measurements(timestamp 
 CREATE INDEX IF NOT EXISTS idx_measurements_site_device ON measurements(site_id, device_sn, timestamp DESC);
 
 -- Enable TimescaleDB hypertable
-SELECT create_hypertable('measurements', 'timestamp', if_not_exists => TRUE);
+SELECT create_hypertable('measurements', 'timestamp', if_not_exists := TRUE);
 
 -- Set up compression policy (compress data older than 7 days)
 ALTER TABLE measurements SET (
@@ -30,7 +33,7 @@ ALTER TABLE measurements SET (
     timescaledb.compress_orderby = 'timestamp DESC'
 );
 
-SELECT add_compression_policy('measurements', INTERVAL '7 days', if_not_exists => TRUE);
+SELECT add_compression_policy('measurements', INTERVAL '7 days', if_not_exists := TRUE);
 
 -- Set up retention policy (keep data for 2 years)
-SELECT add_retention_policy('measurements', INTERVAL '2 years', if_not_exists => TRUE);
+SELECT add_retention_policy('measurements', INTERVAL '2 years', if_not_exists := TRUE);

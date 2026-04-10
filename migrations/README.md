@@ -4,7 +4,7 @@ This directory contains database migrations for the Anker Solix Exporter Timesca
 
 ## Overview
 
-Migrations are automatically run on application startup using golang-migrate. The migrations create and configure a normalized TimescaleDB schema with separate sites, devices, and measurements tables, all prefixed with "solar_".
+Migrations are automatically run on application startup using golang-migrate. The migrations create and configure a normalized TimescaleDB schema with separate sites, devices, and measurements tables.
 
 ## Migration Files
 
@@ -12,34 +12,32 @@ Migrations are automatically run on application startup using golang-migrate. Th
 - `000001_create_measurements_table.down.sql` - Removes the measurements table and all policies
 - `000002_normalize_sites_devices.up.sql` - Normalizes the database by adding sites and devices tables, migrating data, and updating the measurements table structure
 - `000002_normalize_sites_devices.down.sql` - Reverts to the denormalized structure
-- `000003_add_solar_prefix_to_tables.up.sql` - Adds "solar_" prefix to all tables, indexes, and sequences
-- `000003_add_solar_prefix_to_tables.down.sql` - Removes "solar_" prefix from tables, indexes, and sequences
 
 ## Schema Structure
 
 After running all migrations, the database will have the following normalized structure:
 
-### solar_sites Table
+### Sites Table
 Stores information about site locations:
 - `id` - Auto-incrementing primary key
 - `site_id` - Unique site identifier from Anker API
 - `site_name` - Human-readable site name
 - `created_at`, `updated_at` - Timestamps
 
-### solar_devices Table
+### Devices Table
 Stores information about devices at sites:
 - `id` - Auto-incrementing primary key
-- `site_id` - Foreign key to solar_sites table
+- `site_id` - Foreign key to sites table
 - `device_sn` - Unique device serial number
 - `device_name` - Human-readable device name
 - `device_type` - Type of device (e.g., "solarbank", "solar")
 - `created_at`, `updated_at` - Timestamps
 
-### solar_measurements Table
+### Measurements Table
 Stores time-series energy measurements:
 - `id` - Auto-incrementing primary key
 - `timestamp` - Measurement timestamp (hypertable partition key)
-- `device_sn` - Foreign key to solar_devices table
+- `device_sn` - Foreign key to devices table
 - `solar_power`, `output_power`, `grid_power`, `battery_power`, `battery_soc` - Energy metrics
 - `created_at` - Record creation timestamp
 

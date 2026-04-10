@@ -202,8 +202,8 @@ func TestMeasurementModel(t *testing.T) {
 	// Test table name
 	t.Run("TableName", func(t *testing.T) {
 		m := database.Measurement{}
-		if m.TableName() != "solar_measurements" {
-			t.Errorf("expected table name 'solar_measurements', got '%s'", m.TableName())
+		if m.TableName() != "measurements" {
+			t.Errorf("expected table name 'measurements', got '%s'", m.TableName())
 		}
 	})
 
@@ -343,8 +343,8 @@ func TestHelperFunctions(t *testing.T) {
 
 		// Query by joining with devices table
 		var measurements []database.Measurement
-		testDB.Writer.GetDB().Joins("JOIN solar_devices ON solar_devices.device_sn = solar_measurements.device_sn").
-			Where("solar_devices.site_id = ?", "site-a").
+		testDB.Writer.GetDB().Joins("JOIN devices ON devices.device_sn = measurements.device_sn").
+			Where("devices.site_id = ?", "site-a").
 			Find(&measurements)
 
 		if len(measurements) != 2 {

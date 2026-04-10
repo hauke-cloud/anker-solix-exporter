@@ -303,8 +303,8 @@ func TestComplexScenario(t *testing.T) {
 		// Verify specific device on specific site using join
 		var countSiteHome int64
 		testDB.Writer.GetDB().Model(&database.Measurement{}).
-			Joins("JOIN devices ON devices.device_sn = measurements.device_sn").
-			Where("devices.site_id = ? AND measurements.device_sn = ?", "site-home", "solarbank-1").
+			Joins("JOIN solar_devices ON solar_devices.device_sn = solar_measurements.device_sn").
+			Where("solar_devices.site_id = ? AND solar_measurements.device_sn = ?", "site-home", "solarbank-1").
 			Count(&countSiteHome)
 		if countSiteHome != 24 {
 			t.Errorf("expected 24 measurements for site-home/solarbank-1, got %d", countSiteHome)
@@ -324,8 +324,8 @@ func TestComplexScenario(t *testing.T) {
 		// Query peak solar production (hour 23 should have max) using join
 		var measurements []database.Measurement
 		testDB.Writer.GetDB().
-			Joins("JOIN devices ON devices.device_sn = measurements.device_sn").
-			Where("devices.site_id = ? AND measurements.device_sn = ? AND measurements.solar_power >= ?",
+			Joins("JOIN solar_devices ON solar_devices.device_sn = solar_measurements.device_sn").
+			Where("solar_devices.site_id = ? AND solar_measurements.device_sn = ? AND solar_measurements.solar_power >= ?",
 				"site-home", "solarbank-1", 200.0).
 			Find(&measurements)
 

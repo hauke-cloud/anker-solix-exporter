@@ -102,19 +102,19 @@ func (td *TestDatabase) Reset(t *testing.T) {
 	t.Helper()
 
 	// Truncate all tables to reset state (cascade will handle foreign keys)
-	if err := td.Writer.GetDB().Exec("TRUNCATE TABLE measurements, devices, sites CASCADE").Error; err != nil {
+	if err := td.Writer.GetDB().Exec("TRUNCATE TABLE solar_measurements, solar_devices, solar_sites CASCADE").Error; err != nil {
 		t.Fatalf("failed to truncate tables: %s", err)
 	}
 
 	// Reset sequences
-	if err := td.Writer.GetDB().Exec("ALTER SEQUENCE measurements_id_seq RESTART WITH 1").Error; err != nil {
-		t.Logf("warning: failed to reset measurements sequence: %s", err)
+	if err := td.Writer.GetDB().Exec("ALTER SEQUENCE solar_measurements_id_seq RESTART WITH 1").Error; err != nil {
+		t.Logf("warning: failed to reset solar_measurements sequence: %s", err)
 	}
-	if err := td.Writer.GetDB().Exec("ALTER SEQUENCE devices_id_seq RESTART WITH 1").Error; err != nil {
-		t.Logf("warning: failed to reset devices sequence: %s", err)
+	if err := td.Writer.GetDB().Exec("ALTER SEQUENCE solar_devices_id_seq RESTART WITH 1").Error; err != nil {
+		t.Logf("warning: failed to reset solar_devices sequence: %s", err)
 	}
-	if err := td.Writer.GetDB().Exec("ALTER SEQUENCE sites_id_seq RESTART WITH 1").Error; err != nil {
-		t.Logf("warning: failed to reset sites sequence: %s", err)
+	if err := td.Writer.GetDB().Exec("ALTER SEQUENCE solar_sites_id_seq RESTART WITH 1").Error; err != nil {
+		t.Logf("warning: failed to reset solar_sites sequence: %s", err)
 	}
 }
 
@@ -183,7 +183,7 @@ func (td *TestDatabase) IndexExists(t *testing.T, indexName string) bool {
 	var count int64
 	query := `
 		SELECT COUNT(*) FROM pg_indexes 
-		WHERE tablename = 'measurements' 
+		WHERE tablename = 'solar_measurements' 
 		AND indexname = $1
 	`
 	if err := td.Writer.GetDB().Raw(query, indexName).Scan(&count).Error; err != nil {
@@ -199,7 +199,7 @@ func (td *TestDatabase) HasIndexLike(t *testing.T, pattern string) bool {
 	var count int64
 	query := `
 		SELECT COUNT(*) FROM pg_indexes 
-		WHERE tablename = 'measurements' 
+		WHERE tablename = 'solar_measurements' 
 		AND indexname LIKE $1
 	`
 	if err := td.Writer.GetDB().Raw(query, pattern).Scan(&count).Error; err != nil {

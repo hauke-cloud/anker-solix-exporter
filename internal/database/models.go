@@ -18,7 +18,7 @@ type Site struct {
 
 // TableName overrides the table name
 func (Site) TableName() string {
-	return "sites"
+	return "solar_sites"
 }
 
 // Device represents a device at a site
@@ -35,7 +35,7 @@ type Device struct {
 
 // TableName overrides the table name
 func (Device) TableName() string {
-	return "devices"
+	return "solar_devices"
 }
 
 // Measurement represents a single energy measurement from Anker Solix
@@ -54,7 +54,7 @@ type Measurement struct {
 
 // TableName overrides the table name
 func (Measurement) TableName() string {
-	return "measurements"
+	return "solar_measurements"
 }
 
 // BeforeCreate hook to ensure timestamp is set

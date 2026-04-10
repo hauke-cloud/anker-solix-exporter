@@ -84,7 +84,7 @@ func RunMigrations(db *gorm.DB, migrationsPath string, logger *zap.Logger) error
 
 // verifyTablesExist checks that critical tables exist in the database
 func verifyTablesExist(db *gorm.DB, logger *zap.Logger) error {
-	tables := []string{"sites", "devices", "measurements"}
+	tables := []string{"solar_sites", "solar_devices", "solar_measurements"}
 	
 	for _, tableName := range tables {
 		var exists bool

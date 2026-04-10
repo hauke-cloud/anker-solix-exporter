@@ -25,27 +25,8 @@ func RunMigrations(db *gorm.DB, migrationsPath string, logger *zap.Logger) error
 	sqlDB.SetConnMaxIdleTime(10 * time.Minute)
 	defer sqlDB.SetConnMaxLifetime(originalMaxLifetime)
 
-	// Determine which migrations table to use
-	// Check if solar_schema_migrations exists (new name), otherwise use schema_migrations (old name)
-	migrationsTable := "schema_migrations"
-	var solarTableExists bool
-	err = db.Raw(`
-		SELECT EXISTS (
-			SELECT FROM information_schema.tables 
-			WHERE table_schema = 'public' 
-			AND table_name = 'solar_schema_migrations'
-		)
-	`).Scan(&solarTableExists).Error
-	
-	if err == nil && solarTableExists {
-		migrationsTable = "solar_schema_migrations"
-		logger.Info("using solar_schema_migrations table")
-	} else {
-		logger.Info("using schema_migrations table (will be renamed during migration)")
-	}
-
 	driver, err := postgres.WithInstance(sqlDB, &postgres.Config{
-		MigrationsTable: migrationsTable,
+		MigrationsTable: "schema_migrations",
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create migration driver: %w", err)

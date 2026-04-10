@@ -1,6 +1,3 @@
--- This migration renames all tables to add the "solar_" prefix
--- Important: The schema_migrations table is handled specially by the migration runner
-
 -- Rename sites table to solar_sites
 ALTER TABLE sites RENAME TO solar_sites;
 
@@ -37,7 +34,3 @@ ALTER TABLE solar_measurements ADD CONSTRAINT solar_measurements_device_sn_fkey
 ALTER TABLE solar_devices DROP CONSTRAINT IF EXISTS devices_site_id_fkey;
 ALTER TABLE solar_devices ADD CONSTRAINT solar_devices_site_id_fkey 
     FOREIGN KEY (site_id) REFERENCES solar_sites(site_id) ON DELETE CASCADE;
-
--- Rename schema_migrations to solar_schema_migrations
--- This must be done AFTER all other changes, as the migration system needs to find this table
-ALTER TABLE schema_migrations RENAME TO solar_schema_migrations;

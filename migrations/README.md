@@ -12,7 +12,7 @@ Migrations are automatically run on application startup using golang-migrate. Th
 - `000001_create_measurements_table.down.sql` - Removes the measurements table and all policies
 - `000002_normalize_sites_devices.up.sql` - Normalizes the database by adding sites and devices tables, migrating data, and updating the measurements table structure
 - `000002_normalize_sites_devices.down.sql` - Reverts to the denormalized structure
-- `000003_add_solar_prefix_to_tables.up.sql` - Adds "solar_" prefix to all tables (including schema_migrations), indexes, and sequences
+- `000003_add_solar_prefix_to_tables.up.sql` - Adds "solar_" prefix to all tables, indexes, and sequences
 - `000003_add_solar_prefix_to_tables.down.sql` - Removes "solar_" prefix from tables, indexes, and sequences
 
 ## Schema Structure
@@ -42,11 +42,6 @@ Stores time-series energy measurements:
 - `device_sn` - Foreign key to solar_devices table
 - `solar_power`, `output_power`, `grid_power`, `battery_power`, `battery_soc` - Energy metrics
 - `created_at` - Record creation timestamp
-
-### solar_schema_migrations Table
-Tracks which database migrations have been applied (managed by golang-migrate):
-- `version` - Migration version number
-- `dirty` - Whether the migration is in an incomplete state
 
 ## Features
 

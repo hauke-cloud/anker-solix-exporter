@@ -1,3 +1,7 @@
+-- Rename solar_schema_migrations back to schema_migrations first
+-- This must be done BEFORE other changes so the migration system can track the rollback
+ALTER TABLE solar_schema_migrations RENAME TO schema_migrations;
+
 -- Rename solar_measurements table back to measurements
 ALTER TABLE solar_measurements RENAME TO measurements;
 

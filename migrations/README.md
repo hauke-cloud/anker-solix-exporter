@@ -12,7 +12,7 @@ Migrations are automatically run on application startup using golang-migrate. Th
 - `000001_create_measurements_table.down.sql` - Removes the measurements table and all policies
 - `000002_normalize_sites_devices.up.sql` - Normalizes the database by adding sites and devices tables, migrating data, and updating the measurements table structure
 - `000002_normalize_sites_devices.down.sql` - Reverts to the denormalized structure
-- `000003_add_solar_prefix_to_tables.up.sql` - Adds "solar_" prefix to application tables, indexes, and sequences
+- `000003_add_solar_prefix_to_tables.up.sql` - Adds "solar_" prefix to all tables (including schema_migrations), indexes, and sequences
 - `000003_add_solar_prefix_to_tables.down.sql` - Removes "solar_" prefix from tables, indexes, and sequences
 
 ## Schema Structure
